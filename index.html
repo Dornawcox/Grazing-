@@ -1,17 +1,1366 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#16a34a" />
-    <meta name="description" content="Grazing Manager - Map-based seasonal planning for rotational grazing" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <title>Grazing Manager</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#16a34a">
+  <meta name="description" content="Grazing Manager - Map-based seasonal planning for rotational grazing">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Grazing Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'DM Sans', sans-serif; }
+    h1, h2, h3, .display-font { font-family: 'Fraunces', serif; }
+    .seasonal-gradient-spring { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); }
+    .seasonal-gradient-summer { background: linear-gradient(135deg, #fef9c3 0%, #fde68a 100%); }
+    .seasonal-gradient-fall { background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%); }
+    .seasonal-gradient-winter { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); }
+    .paddock-card { transition: all 0.2s ease; }
+    .paddock-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .map-paddock { transition: all 0.15s ease; cursor: pointer; }
+    .map-paddock:hover { filter: brightness(1.1); }
+    @keyframes pulse-gentle { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+    .active-grazing { animation: pulse-gentle 2s ease-in-out infinite; }
+    .nav-tab { position: relative; }
+    .nav-tab.active::after { 
+      content: ''; position: absolute; bottom: -2px; left: 50%; 
+      transform: translateX(-50%); width: 24px; height: 3px; 
+      background: #16a34a; border-radius: 2px; 
+    }
+    .mobile-safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+  </style>
+</head>
+<body class="bg-stone-100 min-h-screen">
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useMemo, useCallback, useEffect } = React;
+
+    // ============== Types & Constants ==============
+    const STORAGE_KEY = 'grazing-manager-state';
+    
+    const seasonConfig = {
+      spring: { color: 'text-green-700', bgColor: 'bg-green-100', gradient: 'seasonal-gradient-spring', icon: '🌱' },
+      summer: { color: 'text-amber-700', bgColor: 'bg-amber-100', gradient: 'seasonal-gradient-summer', icon: '☀️' },
+      fall: { color: 'text-orange-700', bgColor: 'bg-orange-100', gradient: 'seasonal-gradient-fall', icon: '🍂' },
+      winter: { color: 'text-blue-700', bgColor: 'bg-blue-100', gradient: 'seasonal-gradient-winter', icon: '❄️' },
+    };
+
+    const managementTypes = {
+      graze: { label: 'Graze Only', color: '#22c55e', icon: '🐄' },
+      graze_and_hay: { label: 'Graze & Hay', color: '#3b82f6', icon: '🌾' },
+      hay_only: { label: 'Hay Only', color: '#f59e0b', icon: '🌿' },
+      stockpile: { label: 'Stockpile', color: '#8b5cf6', icon: '📦' },
+      rest: { label: 'Rest', color: '#6b7280', icon: '💤' },
+    };
+
+    const animalTypeLabels = {
+      cattle_cow: 'Cow',
+      cattle_calf: 'Calf',
+      cattle_bull: 'Bull',
+      cattle_heifer: 'Heifer',
+      cattle_steer: 'Steer',
+      sheep_ewe: 'Ewe',
+      sheep_ram: 'Ram',
+      sheep_lamb: 'Lamb',
+      goat_doe: 'Doe',
+      goat_buck: 'Buck',
+      goat_kid: 'Kid',
+      horse: 'Horse',
+      donkey: 'Donkey',
+      pig: 'Pig',
+      poultry_chicken: 'Chicken',
+      poultry_turkey: 'Turkey',
+    };
+
+    // ============== Utility Functions ==============
+    const generateId = () => Math.random().toString(36).substr(2, 9);
+    
+    const getCurrentSeason = () => {
+      const month = new Date().getMonth();
+      if (month >= 2 && month <= 4) return 'spring';
+      if (month >= 5 && month <= 7) return 'summer';
+      if (month >= 8 && month <= 10) return 'fall';
+      return 'winter';
+    };
+
+    const formatDate = (date) => {
+      return new Date(date).toLocaleDateString('en-US', { 
+        month: 'short', day: 'numeric', year: 'numeric' 
+      });
+    };
+
+    const formatDateShort = (date) => {
+      return new Date(date).toLocaleDateString('en-US', { 
+        month: 'short', day: 'numeric' 
+      });
+    };
+
+    const calculateAnimalUnits = (count, weight, type) => {
+      // Standard AU = 1000lb animal
+      const baseAU = (count * weight) / 1000;
+      // Adjust for species metabolic differences
+      if (type.startsWith('sheep') || type.startsWith('goat')) return baseAU * 0.9;
+      if (type.startsWith('horse')) return baseAU * 1.1;
+      return baseAU;
+    };
+
+    const estimateDMPerAcre = (height, density) => {
+      // Height in inches, density factor
+      const densityMultiplier = { high: 250, medium: 200, low: 150 };
+      const usableHeight = Math.max(0, height - 4); // Leave 4" residual
+      return usableHeight * (densityMultiplier[density] || 200);
+    };
+
+    const getRecoveryPeriod = (season) => {
+      const periods = { spring: 21, summer: 35, fall: 45, winter: 90 };
+      return periods[season] || 35;
+    };
+
+    // ============== Icons ==============
+    const Icons = {
+      Map: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>,
+      Calendar: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+      List: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>,
+      Dashboard: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>,
+      Plus: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>,
+      X: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>,
+      Check: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
+      Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+      Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      ChevronRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>,
+      Sync: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
+      Download: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>,
+      Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>,
+    };
+
+    // ============== Demo Data (Tuckaway Farm) ==============
+    const createDemoData = () => {
+      const now = new Date().toISOString();
+      
+      const paddocks = [
+        { id: 'p1', name: 'Gibby Border', acres: 8.1, forageYieldPotential: 3.5, managementType: 'graze_and_hay', ph: 6.1, isActive: true, hasWaterAccess: true, hasShadeAccess: true, currentForageHeight: 10, currentForageDensity: 'medium', color: '#22c55e', gridX: 0, gridY: 0, createdAt: now, updatedAt: now },
+        { id: 'p2', name: 'Pond', acres: 6.1, forageYieldPotential: 3.5, managementType: 'graze_and_hay', ph: 6.1, isActive: true, hasWaterAccess: true, hasShadeAccess: true, currentForageHeight: 12, currentForageDensity: 'high', color: '#3b82f6', gridX: 1, gridY: 0, createdAt: now, updatedAt: now },
+        { id: 'p3', name: 'Event', acres: 3.2, forageYieldPotential: 3.5, managementType: 'graze_and_hay', ph: 6.1, isActive: true, hasWaterAccess: true, hasShadeAccess: false, currentForageHeight: 8, currentForageDensity: 'medium', color: '#f59e0b', gridX: 2, gridY: 0, createdAt: now, updatedAt: now },
+        { id: 'p4', name: 'High Power', acres: 4.8, forageYieldPotential: 2.0, managementType: 'graze', ph: 5.8, isActive: true, hasWaterAccess: false, hasShadeAccess: true, currentForageHeight: 6, currentForageDensity: 'low', color: '#ef4444', gridX: 0, gridY: 1, createdAt: now, updatedAt: now },
+        { id: 'p5', name: 'Kidder Plot', acres: 3.2, forageYieldPotential: 3.5, managementType: 'graze_and_hay', ph: 6.4, isActive: true, hasWaterAccess: true, hasShadeAccess: true, currentForageHeight: 11, currentForageDensity: 'medium', color: '#8b5cf6', gridX: 1, gridY: 1, createdAt: now, updatedAt: now },
+        { id: 'p6', name: 'Lang', acres: 1.9, forageYieldPotential: 3.5, managementType: 'graze_and_hay', ph: 6.7, isActive: true, hasWaterAccess: true, hasShadeAccess: true, currentForageHeight: 9, currentForageDensity: 'medium', color: '#06b6d4', gridX: 2, gridY: 1, createdAt: now, updatedAt: now },
+        { id: 'p7', name: 'Hawk NW', acres: 2.0, forageYieldPotential: 3.5, managementType: 'graze_and_hay', ph: 6.3, isActive: true, hasWaterAccess: true, hasShadeAccess: false, currentForageHeight: 10, currentForageDensity: 'high', color: '#ec4899', gridX: 0, gridY: 2, createdAt: now, updatedAt: now },
+        { id: 'p8', name: 'James Pasture', acres: 3.9, forageYieldPotential: 3.5, managementType: 'graze_and_hay', ph: 6.1, isActive: true, hasWaterAccess: true, hasShadeAccess: true, currentForageHeight: 11, currentForageDensity: 'medium', color: '#84cc16', gridX: 1, gridY: 2, createdAt: now, updatedAt: now },
+      ];
+
+      const animalGroups = [
+        { id: 'ag1', name: 'Ewes', type: 'sheep_ewe', count: 65, averageWeight: 130, isOnPasture: true, currentPaddockId: 'p1', createdAt: now, updatedAt: now },
+        { id: 'ag2', name: 'Lambs', type: 'sheep_lamb', count: 92, averageWeight: 75, isOnPasture: true, currentPaddockId: 'p1', createdAt: now, updatedAt: now },
+        { id: 'ag3', name: 'Cows', type: 'cattle_cow', count: 4, averageWeight: 1000, isOnPasture: true, currentPaddockId: 'p2', createdAt: now, updatedAt: now },
+        { id: 'ag4', name: 'Calves', type: 'cattle_calf', count: 4, averageWeight: 500, isOnPasture: true, currentPaddockId: 'p2', createdAt: now, updatedAt: now },
+      ];
+
+      const herds = [
+        { id: 'h1', name: 'Sheep Flock', groupIds: ['ag1', 'ag2'], color: '#f59e0b', createdAt: now, updatedAt: now },
+        { id: 'h2', name: 'Beef Herd', groupIds: ['ag3', 'ag4'], color: '#8b5cf6', createdAt: now, updatedAt: now },
+      ];
+
+      const grazingEvents = [
+        { id: 'ge1', paddockId: 'p1', herdId: 'h1', startDate: new Date(Date.now() - 2*24*60*60*1000).toISOString(), plannedDays: 4, status: 'active', preGrazingHeight: 10, preGrazingDensity: 'medium', createdAt: now, updatedAt: now },
+        { id: 'ge2', paddockId: 'p2', herdId: 'h2', startDate: new Date(Date.now() - 1*24*60*60*1000).toISOString(), plannedDays: 5, status: 'active', preGrazingHeight: 12, preGrazingDensity: 'high', createdAt: now, updatedAt: now },
+      ];
+
+      const forageReadings = [];
+
+      return { paddocks, animalGroups, herds, grazingEvents, forageReadings };
+    };
+
+    // ============== Modal Component ==============
+    function Modal({ title, onClose, children }) {
+      return (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-semibold display-font">{title}</h2>
+              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
+                <Icons.X />
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {children}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Map View ==============
+    function MapView({ paddocks, animalGroups, herds, grazingEvents, season, onSelectPaddock }) {
+      const seasonStyle = seasonConfig[season];
+      
+      const getPaddockStatus = (paddock) => {
+        const activeEvent = grazingEvents.find(e => e.paddockId === paddock.id && e.status === 'active');
+        if (activeEvent) {
+          const herd = herds.find(h => h.id === activeEvent.herdId);
+          return { status: 'grazing', herd, event: activeEvent };
+        }
+        const dmPerAcre = estimateDMPerAcre(paddock.currentForageHeight, paddock.currentForageDensity);
+        if (dmPerAcre > 1500) return { status: 'ready', dmPerAcre };
+        if (dmPerAcre > 800) return { status: 'recovering', dmPerAcre };
+        return { status: 'resting', dmPerAcre };
+      };
+
+      const statusColors = {
+        grazing: 'ring-4 ring-green-500 ring-offset-2',
+        ready: 'ring-2 ring-emerald-400',
+        recovering: 'ring-2 ring-amber-400',
+        resting: 'ring-2 ring-gray-300',
+      };
+
+      // Create grid layout
+      const maxX = Math.max(...paddocks.map(p => p.gridX || 0)) + 1;
+      const maxY = Math.max(...paddocks.map(p => p.gridY || 0)) + 1;
+
+      return (
+        <div className={`flex-1 ${seasonStyle.gradient} p-4 overflow-auto`}>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">{seasonStyle.icon}</span>
+            <h2 className={`text-xl font-semibold display-font ${seasonStyle.color} capitalize`}>
+              {season} Grazing Map
+            </h2>
+          </div>
+          
+          <div 
+            className="grid gap-3 mb-4"
+            style={{ 
+              gridTemplateColumns: `repeat(${maxX}, minmax(0, 1fr))`,
+              minHeight: '300px' 
+            }}
+          >
+            {paddocks.map(paddock => {
+              const info = getPaddockStatus(paddock);
+              const animalsHere = animalGroups.filter(ag => ag.currentPaddockId === paddock.id);
+              
+              return (
+                <div
+                  key={paddock.id}
+                  onClick={() => onSelectPaddock(paddock)}
+                  className={`
+                    map-paddock rounded-xl p-3 bg-white shadow-lg
+                    ${statusColors[info.status]}
+                    ${info.status === 'grazing' ? 'active-grazing' : ''}
+                  `}
+                  style={{ 
+                    gridColumn: (paddock.gridX || 0) + 1,
+                    gridRow: (paddock.gridY || 0) + 1,
+                    borderLeft: `4px solid ${paddock.color}`,
+                  }}
+                >
+                  <div className="font-semibold text-gray-800 truncate">{paddock.name}</div>
+                  <div className="text-sm text-gray-500">{paddock.acres} acres</div>
+                  
+                  {info.status === 'grazing' && info.herd && (
+                    <div className="mt-2 flex items-center gap-1 text-green-700 text-sm font-medium">
+                      <span>🐄</span>
+                      <span>{info.herd.name}</span>
+                    </div>
+                  )}
+                  
+                  {info.status !== 'grazing' && (
+                    <div className="mt-2 text-xs">
+                      <span className={`
+                        px-2 py-1 rounded-full font-medium
+                        ${info.status === 'ready' ? 'bg-emerald-100 text-emerald-700' : ''}
+                        ${info.status === 'recovering' ? 'bg-amber-100 text-amber-700' : ''}
+                        ${info.status === 'resting' ? 'bg-gray-100 text-gray-600' : ''}
+                      `}>
+                        {info.dmPerAcre?.toFixed(0)} lbs DM/ac
+                      </span>
+                    </div>
+                  )}
+
+                  {animalsHere.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {animalsHere.map(ag => (
+                        <span key={ag.id} className="text-xs bg-white/80 px-1.5 py-0.5 rounded">
+                          {ag.count} {ag.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Legend */}
+          <div className="bg-white/80 rounded-lg p-3 inline-flex flex-wrap gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-green-500"></div>
+              <span>Currently Grazing</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-emerald-400"></div>
+              <span>Ready to Graze</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-amber-400"></div>
+              <span>Recovering</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-gray-300"></div>
+              <span>Resting</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Calendar View ==============
+    function CalendarView({ paddocks, herds, grazingEvents, season }) {
+      const seasonStyle = seasonConfig[season];
+      const today = new Date();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+
+      const days = Array.from({ length: 14 }, (_, i) => {
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + i);
+        return d;
+      });
+
+      const getEventsForDay = (date) => {
+        return grazingEvents.filter(event => {
+          const start = new Date(event.startDate);
+          const end = new Date(start);
+          end.setDate(start.getDate() + (event.plannedDays || 1));
+          return date >= start && date < end;
+        });
+      };
+
+      return (
+        <div className={`flex-1 ${seasonStyle.gradient} p-4 overflow-auto`}>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">{seasonStyle.icon}</span>
+            <h2 className={`text-xl font-semibold display-font ${seasonStyle.color}`}>
+              Grazing Calendar
+            </h2>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="grid grid-cols-7 text-center text-sm font-medium bg-gray-50 border-b">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="py-2 text-gray-600">{day}</div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-7">
+              {days.map((date, i) => {
+                const events = getEventsForDay(date);
+                const isToday = date.toDateString() === today.toDateString();
+                
+                return (
+                  <div 
+                    key={i}
+                    className={`
+                      min-h-[100px] p-2 border-b border-r
+                      ${isToday ? 'bg-green-50' : ''}
+                      ${i >= 7 ? 'bg-gray-50/50' : ''}
+                    `}
+                  >
+                    <div className={`
+                      text-sm font-medium mb-1
+                      ${isToday ? 'text-green-600' : 'text-gray-600'}
+                    `}>
+                      {date.getDate()}
+                      {isToday && <span className="ml-1 text-xs">(Today)</span>}
+                    </div>
+                    
+                    <div className="space-y-1">
+                      {events.map(event => {
+                        const paddock = paddocks.find(p => p.id === event.paddockId);
+                        const herd = herds.find(h => h.id === event.herdId);
+                        return (
+                          <div 
+                            key={event.id}
+                            className="text-xs p-1.5 rounded truncate"
+                            style={{ 
+                              backgroundColor: `${herd?.color || '#22c55e'}20`,
+                              borderLeft: `3px solid ${herd?.color || '#22c55e'}`
+                            }}
+                          >
+                            {herd?.name} → {paddock?.name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recovery Period Info */}
+          <div className="mt-4 bg-white/80 rounded-lg p-4">
+            <h3 className="font-semibold mb-2">Recovery Periods by Season</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+              {Object.entries(seasonConfig).map(([s, cfg]) => (
+                <div key={s} className={`${cfg.bgColor} rounded-lg p-2 text-center`}>
+                  <span className="mr-1">{cfg.icon}</span>
+                  <span className="capitalize font-medium">{s}</span>
+                  <div className={`${cfg.color} font-semibold`}>{getRecoveryPeriod(s)} days</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== List View ==============
+    function ListView({ paddocks, animalGroups, herds, grazingEvents, onEdit, onDelete }) {
+      const [activeTab, setActiveTab] = useState('paddocks');
+
+      const tabs = [
+        { id: 'paddocks', label: 'Paddocks', count: paddocks.length },
+        { id: 'animals', label: 'Animals', count: animalGroups.length },
+        { id: 'herds', label: 'Herds', count: herds.length },
+        { id: 'events', label: 'Events', count: grazingEvents.length },
+      ];
+
+      return (
+        <div className="flex-1 bg-stone-100 overflow-hidden flex flex-col">
+          {/* Tabs */}
+          <div className="bg-white border-b px-4 py-2 flex gap-4 overflow-x-auto">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`
+                  px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap
+                  ${activeTab === tab.id 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'text-gray-600 hover:bg-gray-100'}
+                `}
+              >
+                {tab.label}
+                <span className="ml-1 text-xs bg-white/50 px-1.5 py-0.5 rounded-full">
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-auto p-4">
+            {activeTab === 'paddocks' && (
+              <div className="space-y-3">
+                {paddocks.map(paddock => {
+                  const dmPerAcre = estimateDMPerAcre(paddock.currentForageHeight, paddock.currentForageDensity);
+                  return (
+                    <div key={paddock.id} className="paddock-card bg-white rounded-xl p-4 shadow" style={{ borderLeft: `4px solid ${paddock.color}` }}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">{paddock.name}</h3>
+                          <p className="text-sm text-gray-500">{paddock.acres} acres • pH {paddock.ph}</p>
+                        </div>
+                        <span className="text-2xl">{managementTypes[paddock.managementType]?.icon}</span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                          {paddock.currentForageHeight}" height
+                        </span>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                          {dmPerAcre.toFixed(0)} lbs DM/ac
+                        </span>
+                        {paddock.hasWaterAccess && (
+                          <span className="text-xs bg-cyan-100 text-cyan-700 px-2 py-1 rounded-full">💧 Water</span>
+                        )}
+                        {paddock.hasShadeAccess && (
+                          <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">🌳 Shade</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeTab === 'animals' && (
+              <div className="space-y-3">
+                {animalGroups.map(group => {
+                  const au = calculateAnimalUnits(group.count, group.averageWeight, group.type);
+                  const paddock = paddocks.find(p => p.id === group.currentPaddockId);
+                  return (
+                    <div key={group.id} className="paddock-card bg-white rounded-xl p-4 shadow">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">{group.name}</h3>
+                          <p className="text-sm text-gray-500">
+                            {group.count} {animalTypeLabels[group.type] || group.type}s • {group.averageWeight} lbs avg
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-green-600">{au.toFixed(1)} AU</div>
+                          <div className="text-xs text-gray-500">Animal Units</div>
+                        </div>
+                      </div>
+                      {paddock && (
+                        <div className="mt-2 text-sm text-gray-600">
+                          📍 Currently in: <span className="font-medium">{paddock.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeTab === 'herds' && (
+              <div className="space-y-3">
+                {herds.map(herd => {
+                  const groups = animalGroups.filter(ag => herd.groupIds?.includes(ag.id));
+                  const totalAnimals = groups.reduce((sum, g) => sum + g.count, 0);
+                  const totalAU = groups.reduce((sum, g) => sum + calculateAnimalUnits(g.count, g.averageWeight, g.type), 0);
+                  
+                  return (
+                    <div key={herd.id} className="paddock-card bg-white rounded-xl p-4 shadow" style={{ borderLeft: `4px solid ${herd.color}` }}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-gray-800">{herd.name}</h3>
+                          <p className="text-sm text-gray-500">{groups.length} groups • {totalAnimals} animals</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-purple-600">{totalAU.toFixed(1)} AU</div>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {groups.map(g => (
+                          <span key={g.id} className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                            {g.count} {g.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeTab === 'events' && (
+              <div className="space-y-3">
+                {grazingEvents.map(event => {
+                  const paddock = paddocks.find(p => p.id === event.paddockId);
+                  const herd = herds.find(h => h.id === event.herdId);
+                  const startDate = new Date(event.startDate);
+                  const endDate = new Date(startDate);
+                  endDate.setDate(startDate.getDate() + (event.plannedDays || 1));
+                  
+                  return (
+                    <div key={event.id} className="paddock-card bg-white rounded-xl p-4 shadow">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: herd?.color }}
+                            ></span>
+                            <h3 className="font-semibold text-gray-800">{herd?.name || 'Unknown Herd'}</h3>
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            → {paddock?.name || 'Unknown Paddock'}
+                          </p>
+                        </div>
+                        <span className={`
+                          px-2 py-1 rounded-full text-xs font-medium
+                          ${event.status === 'active' ? 'bg-green-100 text-green-700' : ''}
+                          ${event.status === 'planned' ? 'bg-blue-100 text-blue-700' : ''}
+                          ${event.status === 'completed' ? 'bg-gray-100 text-gray-700' : ''}
+                        `}>
+                          {event.status}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm text-gray-600">
+                        {formatDateShort(startDate)} — {formatDateShort(endDate)} ({event.plannedDays} days)
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Dashboard View ==============
+    function DashboardView({ paddocks, animalGroups, herds, grazingEvents, forageReadings, season }) {
+      const seasonStyle = seasonConfig[season];
+      
+      const totalAcres = paddocks.reduce((sum, p) => sum + p.acres, 0);
+      const totalAnimals = animalGroups.reduce((sum, g) => sum + g.count, 0);
+      const totalAU = animalGroups.reduce((sum, g) => sum + calculateAnimalUnits(g.count, g.averageWeight, g.type), 0);
+      
+      const avgDM = paddocks.reduce((sum, p) => {
+        return sum + estimateDMPerAcre(p.currentForageHeight, p.currentForageDensity);
+      }, 0) / paddocks.length;
+
+      const activeEvents = grazingEvents.filter(e => e.status === 'active');
+      const recoveryPeriod = getRecoveryPeriod(season);
+
+      // Calculate carrying capacity
+      const totalDM = paddocks.reduce((sum, p) => {
+        const dm = estimateDMPerAcre(p.currentForageHeight, p.currentForageDensity);
+        return sum + (dm * p.acres);
+      }, 0);
+      const dailyIntake = totalAU * 26; // ~26 lbs DM per AU per day
+      const grazingDaysAvailable = totalDM / dailyIntake;
+
+      return (
+        <div className={`flex-1 ${seasonStyle.gradient} p-4 overflow-auto`}>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-2xl">{seasonStyle.icon}</span>
+            <h2 className={`text-xl font-semibold display-font ${seasonStyle.color}`}>
+              Farm Dashboard
+            </h2>
+          </div>
+
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="bg-white rounded-xl p-4 shadow">
+              <div className="text-3xl font-bold text-green-600">{totalAcres.toFixed(1)}</div>
+              <div className="text-sm text-gray-600">Total Acres</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow">
+              <div className="text-3xl font-bold text-blue-600">{totalAnimals}</div>
+              <div className="text-sm text-gray-600">Total Animals</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow">
+              <div className="text-3xl font-bold text-purple-600">{totalAU.toFixed(1)}</div>
+              <div className="text-sm text-gray-600">Animal Units</div>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow">
+              <div className="text-3xl font-bold text-amber-600">{avgDM.toFixed(0)}</div>
+              <div className="text-sm text-gray-600">Avg lbs DM/ac</div>
+            </div>
+          </div>
+
+          {/* Carrying Capacity */}
+          <div className="bg-white rounded-xl p-4 shadow mb-4">
+            <h3 className="font-semibold text-gray-800 mb-3">Carrying Capacity Analysis</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-sm text-gray-600">Available Forage</div>
+                <div className="text-2xl font-bold text-green-600">{(totalDM / 1000).toFixed(1)}k lbs</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Daily Herd Intake</div>
+                <div className="text-2xl font-bold text-blue-600">{dailyIntake.toFixed(0)} lbs</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Grazing Days Available</div>
+                <div className="text-2xl font-bold text-purple-600">{grazingDaysAvailable.toFixed(0)} days</div>
+              </div>
+              <div>
+                <div className="text-sm text-gray-600">Recovery Period ({season})</div>
+                <div className="text-2xl font-bold text-amber-600">{recoveryPeriod} days</div>
+              </div>
+            </div>
+            
+            <div className="mt-4 p-3 rounded-lg bg-gray-50">
+              <div className="text-sm font-medium text-gray-700 mb-1">Rotation Status</div>
+              <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all"
+                  style={{ 
+                    width: `${Math.min(100, (grazingDaysAvailable / recoveryPeriod) * 100)}%`,
+                    backgroundColor: grazingDaysAvailable >= recoveryPeriod ? '#22c55e' : 
+                                    grazingDaysAvailable >= recoveryPeriod * 0.7 ? '#f59e0b' : '#ef4444'
+                  }}
+                ></div>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {grazingDaysAvailable >= recoveryPeriod 
+                  ? '✅ Sustainable rotation capacity'
+                  : `⚠️ Need ${(recoveryPeriod - grazingDaysAvailable).toFixed(0)} more days of forage for full recovery`
+                }
+              </div>
+            </div>
+          </div>
+
+          {/* Active Grazing */}
+          <div className="bg-white rounded-xl p-4 shadow mb-4">
+            <h3 className="font-semibold text-gray-800 mb-3">Active Grazing Events</h3>
+            {activeEvents.length === 0 ? (
+              <p className="text-gray-500 text-sm">No active grazing events</p>
+            ) : (
+              <div className="space-y-2">
+                {activeEvents.map(event => {
+                  const paddock = paddocks.find(p => p.id === event.paddockId);
+                  const herd = herds.find(h => h.id === event.herdId);
+                  const startDate = new Date(event.startDate);
+                  const daysIn = Math.floor((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                  
+                  return (
+                    <div key={event.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: herd?.color }}></div>
+                        <div>
+                          <div className="font-medium text-gray-800">{herd?.name}</div>
+                          <div className="text-sm text-gray-600">in {paddock?.name}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-medium text-green-600">Day {daysIn + 1} of {event.plannedDays}</div>
+                        <div className="text-xs text-gray-500">
+                          {event.plannedDays - daysIn - 1} days remaining
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Paddock Forage Status */}
+          <div className="bg-white rounded-xl p-4 shadow">
+            <h3 className="font-semibold text-gray-800 mb-3">Paddock Forage Status</h3>
+            <div className="space-y-2">
+              {paddocks
+                .sort((a, b) => {
+                  const dmA = estimateDMPerAcre(a.currentForageHeight, a.currentForageDensity);
+                  const dmB = estimateDMPerAcre(b.currentForageHeight, b.currentForageDensity);
+                  return dmB - dmA;
+                })
+                .map(paddock => {
+                  const dm = estimateDMPerAcre(paddock.currentForageHeight, paddock.currentForageDensity);
+                  const maxDM = 2500;
+                  const percent = Math.min(100, (dm / maxDM) * 100);
+                  
+                  return (
+                    <div key={paddock.id} className="flex items-center gap-3">
+                      <div className="w-24 text-sm font-medium truncate">{paddock.name}</div>
+                      <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all"
+                          style={{ 
+                            width: `${percent}%`,
+                            backgroundColor: paddock.color
+                          }}
+                        ></div>
+                      </div>
+                      <div className="w-16 text-right text-sm text-gray-600">{dm.toFixed(0)}</div>
+                    </div>
+                  );
+                })
+              }
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Add Paddock Modal ==============
+    function AddPaddockModal({ onClose, onSave }) {
+      const [name, setName] = useState('');
+      const [acres, setAcres] = useState('');
+      const [managementType, setManagementType] = useState('graze');
+      const [ph, setPh] = useState('6.5');
+      const [hasWater, setHasWater] = useState(false);
+      const [hasShade, setHasShade] = useState(false);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name || !acres) return;
+        
+        const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
+        
+        onSave({
+          id: generateId(),
+          name,
+          acres: parseFloat(acres),
+          forageYieldPotential: 3.0,
+          managementType,
+          ph: parseFloat(ph),
+          isActive: true,
+          hasWaterAccess: hasWater,
+          hasShadeAccess: hasShade,
+          currentForageHeight: 8,
+          currentForageDensity: 'medium',
+          color: colors[Math.floor(Math.random() * colors.length)],
+          gridX: 0,
+          gridY: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        onClose();
+      };
+
+      return (
+        <Modal title="Add Paddock" onClose={onClose}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+                placeholder="e.g., North Pasture"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Acres *</label>
+              <input
+                type="number"
+                step="0.1"
+                value={acres}
+                onChange={e => setAcres(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+                placeholder="e.g., 5.5"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Management Type</label>
+              <select
+                value={managementType}
+                onChange={e => setManagementType(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+              >
+                {Object.entries(managementTypes).map(([key, val]) => (
+                  <option key={key} value={key}>{val.icon} {val.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Soil pH</label>
+              <input
+                type="number"
+                step="0.1"
+                min="4"
+                max="9"
+                value={ph}
+                onChange={e => setPh(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
+
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={hasWater}
+                  onChange={e => setHasWater(e.target.checked)}
+                  className="w-5 h-5 rounded"
+                />
+                <span>💧 Water Access</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={hasShade}
+                  onChange={e => setHasShade(e.target.checked)}
+                  className="w-5 h-5 rounded"
+                />
+                <span>🌳 Shade Access</span>
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3 border rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Add Paddock
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    // ============== Move Animals Modal ==============
+    function MoveAnimalsModal({ onClose, onSave, herds, paddocks, animalGroups }) {
+      const [herdId, setHerdId] = useState(herds[0]?.id || '');
+      const [paddockId, setPaddockId] = useState('');
+      const [plannedDays, setPlannedDays] = useState('3');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!herdId || !paddockId) return;
+        
+        const herd = herds.find(h => h.id === herdId);
+        const groupIds = herd?.groupIds || [];
+        
+        // Update animal locations
+        groupIds.forEach(gid => {
+          const group = animalGroups.find(ag => ag.id === gid);
+          if (group) {
+            group.currentPaddockId = paddockId;
+          }
+        });
+
+        onSave({
+          id: generateId(),
+          paddockId,
+          herdId,
+          startDate: new Date().toISOString(),
+          plannedDays: parseInt(plannedDays),
+          status: 'active',
+          preGrazingHeight: 10,
+          preGrazingDensity: 'medium',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        onClose();
+      };
+
+      return (
+        <Modal title="Move Herd to Paddock" onClose={onClose}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Herd *</label>
+              <select
+                value={herdId}
+                onChange={e => setHerdId(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+                required
+              >
+                <option value="">Choose a herd...</option>
+                {herds.map(herd => (
+                  <option key={herd.id} value={herd.id}>{herd.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Move to Paddock *</label>
+              <select
+                value={paddockId}
+                onChange={e => setPaddockId(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+                required
+              >
+                <option value="">Choose a paddock...</option>
+                {paddocks.filter(p => p.isActive).map(paddock => {
+                  const dm = estimateDMPerAcre(paddock.currentForageHeight, paddock.currentForageDensity);
+                  return (
+                    <option key={paddock.id} value={paddock.id}>
+                      {paddock.name} ({paddock.acres} ac, {dm.toFixed(0)} lbs DM/ac)
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Planned Days</label>
+              <input
+                type="number"
+                min="1"
+                max="30"
+                value={plannedDays}
+                onChange={e => setPlannedDays(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3 border rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Move Herd
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    // ============== Take Reading Modal ==============
+    function TakeReadingModal({ onClose, onSave, paddocks }) {
+      const [paddockId, setPaddockId] = useState(paddocks[0]?.id || '');
+      const [height, setHeight] = useState('10');
+      const [density, setDensity] = useState('medium');
+      const [notes, setNotes] = useState('');
+
+      const dmPerAcre = estimateDMPerAcre(parseFloat(height), density);
+      const paddock = paddocks.find(p => p.id === paddockId);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        
+        // Update paddock forage data
+        if (paddock) {
+          paddock.currentForageHeight = parseFloat(height);
+          paddock.currentForageDensity = density;
+          paddock.updatedAt = new Date().toISOString();
+        }
+
+        onSave({
+          id: generateId(),
+          paddockId,
+          date: new Date().toISOString(),
+          height: parseFloat(height),
+          density,
+          estimatedDMPerAcre: dmPerAcre,
+          notes,
+          createdAt: new Date().toISOString(),
+        });
+        onClose();
+      };
+
+      return (
+        <Modal title="Take Forage Reading" onClose={onClose}>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Paddock *</label>
+              <select
+                value={paddockId}
+                onChange={e => setPaddockId(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+                required
+              >
+                {paddocks.filter(p => p.isActive).map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Forage Height: {height}"
+              </label>
+              <input
+                type="range"
+                min="4"
+                max="18"
+                step="0.5"
+                value={height}
+                onChange={e => setHeight(e.target.value)}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>4" (min residual)</span>
+                <span>18" (max)</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Forage Density (Grazing Stick Method)
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'high', label: 'High', desc: '0-1 dots visible' },
+                  { value: 'medium', label: 'Medium', desc: '1-2 dots visible' },
+                  { value: 'low', label: 'Low', desc: '3+ dots visible' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setDensity(opt.value)}
+                    className={`p-3 rounded-lg border-2 text-center ${
+                      density === opt.value 
+                        ? 'border-green-500 bg-green-50' 
+                        : 'border-gray-200'
+                    }`}
+                  >
+                    <div className="font-medium">{opt.label}</div>
+                    <div className="text-xs text-gray-500">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <div className="text-3xl font-bold text-blue-700">{dmPerAcre.toFixed(0)}</div>
+              <div className="text-sm text-blue-600">Estimated lbs DM/acre</div>
+              {paddock && (
+                <div className="text-xs text-blue-500 mt-1">
+                  Total: {(dmPerAcre * paddock.acres).toFixed(0)} lbs for {paddock.name}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                className="w-full p-3 border rounded-lg"
+                rows={2}
+                placeholder="Species composition, quality observations..."
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-3 border rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Save Reading
+              </button>
+            </div>
+          </form>
+        </Modal>
+      );
+    }
+
+    // ============== Main App ==============
+    function GrazingManager() {
+      const [state, setState] = useState(() => {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            return JSON.parse(saved);
+          }
+        } catch (e) {
+          console.warn('Failed to load saved state');
+        }
+        return {
+          ...createDemoData(),
+          currentSeason: getCurrentSeason(),
+        };
+      });
+
+      const [view, setView] = useState('map');
+      const [modal, setModal] = useState(null);
+      const [selectedPaddock, setSelectedPaddock] = useState(null);
+
+      // Save to localStorage
+      useEffect(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (e) {
+          console.warn('Failed to save state');
+        }
+      }, [state]);
+
+      const { paddocks, animalGroups, herds, grazingEvents, forageReadings, currentSeason } = state;
+
+      const handleAddPaddock = (paddock) => {
+        setState(prev => ({
+          ...prev,
+          paddocks: [...prev.paddocks, paddock],
+        }));
+      };
+
+      const handleMoveHerd = (event) => {
+        setState(prev => ({
+          ...prev,
+          grazingEvents: [...prev.grazingEvents, event],
+          animalGroups: prev.animalGroups.map(ag => {
+            const herd = prev.herds.find(h => h.id === event.herdId);
+            if (herd?.groupIds?.includes(ag.id)) {
+              return { ...ag, currentPaddockId: event.paddockId };
+            }
+            return ag;
+          }),
+        }));
+      };
+
+      const handleTakeReading = (reading) => {
+        setState(prev => ({
+          ...prev,
+          forageReadings: [...(prev.forageReadings || []), reading],
+          paddocks: prev.paddocks.map(p => {
+            if (p.id === reading.paddockId) {
+              return {
+                ...p,
+                currentForageHeight: reading.height,
+                currentForageDensity: reading.density,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return p;
+          }),
+        }));
+      };
+
+      const handleExport = () => {
+        const dataStr = JSON.stringify(state, null, 2);
+        const blob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `grazing-data-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const seasonStyle = seasonConfig[currentSeason];
+
+      return (
+        <div className="h-screen flex flex-col bg-stone-100">
+          {/* Header */}
+          <header className="bg-white shadow-sm px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">🌿</span>
+              <div>
+                <h1 className="text-xl font-bold display-font text-gray-800">Grazing Manager</h1>
+                <div className="text-xs text-gray-500 flex items-center gap-2">
+                  <span className={seasonStyle.color}>{seasonStyle.icon} {currentSeason}</span>
+                  <span>•</span>
+                  <span>Tuckaway Farm</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleExport}
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"
+              title="Export Data"
+            >
+              <Icons.Download />
+            </button>
+          </header>
+
+          {/* Main Content */}
+          {view === 'map' && (
+            <MapView 
+              paddocks={paddocks}
+              animalGroups={animalGroups}
+              herds={herds}
+              grazingEvents={grazingEvents}
+              season={currentSeason}
+              onSelectPaddock={setSelectedPaddock}
+            />
+          )}
+          {view === 'calendar' && (
+            <CalendarView
+              paddocks={paddocks}
+              herds={herds}
+              grazingEvents={grazingEvents}
+              season={currentSeason}
+            />
+          )}
+          {view === 'list' && (
+            <ListView
+              paddocks={paddocks}
+              animalGroups={animalGroups}
+              herds={herds}
+              grazingEvents={grazingEvents}
+            />
+          )}
+          {view === 'dashboard' && (
+            <DashboardView
+              paddocks={paddocks}
+              animalGroups={animalGroups}
+              herds={herds}
+              grazingEvents={grazingEvents}
+              forageReadings={forageReadings}
+              season={currentSeason}
+            />
+          )}
+
+          {/* Quick Actions FAB */}
+          <div className="fixed bottom-24 right-4 flex flex-col gap-2">
+            <button
+              onClick={() => setModal('reading')}
+              className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700"
+              title="Take Forage Reading"
+            >
+              📏
+            </button>
+            <button
+              onClick={() => setModal('move')}
+              className="w-12 h-12 bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-purple-700"
+              title="Move Herd"
+            >
+              🐄
+            </button>
+            <button
+              onClick={() => setModal('paddock')}
+              className="w-14 h-14 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-green-700"
+              title="Add Paddock"
+            >
+              <Icons.Plus />
+            </button>
+          </div>
+
+          {/* Bottom Navigation */}
+          <nav className="bg-white border-t px-6 py-2 mobile-safe-bottom">
+            <div className="flex justify-around max-w-md mx-auto">
+              {[
+                { id: 'map', icon: Icons.Map, label: 'Map' },
+                { id: 'calendar', icon: Icons.Calendar, label: 'Calendar' },
+                { id: 'list', icon: Icons.List, label: 'List' },
+                { id: 'dashboard', icon: Icons.Dashboard, label: 'Dashboard' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setView(tab.id)}
+                  className={`nav-tab flex flex-col items-center py-2 px-3 ${
+                    view === tab.id ? 'active text-green-600' : 'text-gray-500'
+                  }`}
+                >
+                  <tab.icon />
+                  <span className="text-xs mt-1">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {/* Modals */}
+          {modal === 'paddock' && (
+            <AddPaddockModal
+              onClose={() => setModal(null)}
+              onSave={handleAddPaddock}
+            />
+          )}
+          {modal === 'move' && (
+            <MoveAnimalsModal
+              onClose={() => setModal(null)}
+              onSave={handleMoveHerd}
+              herds={herds}
+              paddocks={paddocks}
+              animalGroups={animalGroups}
+            />
+          )}
+          {modal === 'reading' && (
+            <TakeReadingModal
+              onClose={() => setModal(null)}
+              onSave={handleTakeReading}
+              paddocks={paddocks}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // Mount the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<GrazingManager />);
+  </script>
+</body>
 </html>
