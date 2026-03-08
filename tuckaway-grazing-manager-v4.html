@@ -1,0 +1,2020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Tuckaway Farm - Grazing Manager v4</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<style>
+:root{--forest:#1a2e0a;--forest-mid:#243d10;--grass:#4d7c0f;--grass-light:#65a30d;--amber:#d4a030;--hay:#ca8a04;--earth:#78350f;--parchment:#faf5e4;--muted:#9ca3af;--divider:rgba(77,124,15,0.4);--danger:#dc2626;--info:#0ea5e9;--water:#0ea5e9;--fence:#f97316}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--forest);color:var(--parchment);min-height:100vh}
+#topbar{background:var(--forest-mid);border-bottom:2px solid var(--grass);padding:0 12px;display:flex;align-items:center;height:54px;position:sticky;top:0;z-index:100}
+.brand{display:flex;align-items:center;gap:8px;padding-right:16px;border-right:1px solid var(--divider);margin-right:12px}
+.brand-icon{width:32px;height:32px;background:var(--grass);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px}
+.brand-name{font-size:15px;font-weight:700;color:var(--grass-light)}
+.nav{display:flex;gap:2px;flex:1;overflow-x:auto}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{display:flex;flex-direction:column;align-items:center;padding:6px 10px;background:none;border:none;color:rgba(250,245,228,0.5);font-size:9px;font-weight:600;text-transform:uppercase;cursor:pointer;border-radius:4px;min-width:46px}
+.nav-btn:hover{color:var(--parchment);background:rgba(255,255,255,0.05)}
+.nav-btn.active{color:var(--grass-light);background:rgba(101,163,13,0.15)}
+.nav-btn svg{width:18px;height:18px;margin-bottom:2px}
+.topbar-actions{display:flex;gap:8px;margin-left:auto;padding-left:12px;border-left:1px solid var(--divider)}
+.icon-btn{width:34px;height:34px;border-radius:50%;background:none;border:1px solid var(--divider);color:var(--parchment);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.icon-btn:hover{border-color:var(--grass);color:var(--grass-light)}
+.icon-btn svg{width:16px;height:16px}
+.icon-btn.recording{background:var(--danger);border-color:var(--danger);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+#content{max-width:1400px;margin:0 auto;padding:16px}
+.page{display:none}
+.page.active{display:block}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--divider);flex-wrap:wrap;gap:10px}
+.page-title{font-size:20px;font-weight:700;color:var(--grass-light)}
+.page-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.btn{font-size:10px;font-weight:600;text-transform:uppercase;padding:8px 12px;border-radius:6px;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.btn svg{width:14px;height:14px}
+.btn-green{background:var(--grass);color:var(--parchment)}
+.btn-green:hover{background:var(--grass-light)}
+.btn-outline{background:transparent;border:1px solid var(--divider);color:var(--parchment)}
+.btn-outline:hover{border-color:var(--grass);color:var(--grass-light)}
+.btn-outline.active{background:rgba(101,163,13,0.2);border-color:var(--grass)}
+.btn-hay{background:var(--hay);color:#1a1a1a}
+.btn-danger{background:var(--danger);color:white}
+.btn-water{background:var(--water);color:white}
+.btn-fence{background:var(--fence);color:white}
+.btn-sm{padding:5px 8px;font-size:9px}
+.card{background:var(--forest-mid);border:1px solid var(--divider);border-radius:8px;margin-bottom:14px;overflow:hidden}
+.card-header{padding:10px 14px;border-bottom:1px solid var(--divider);background:rgba(0,0,0,0.15);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:14px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--forest-mid);border:1px solid var(--divider);border-radius:8px;padding:12px;text-align:center;border-top:3px solid var(--grass)}
+.stat.amber{border-top-color:var(--amber)}
+.stat.hay{border-top-color:var(--hay)}
+.stat.earth{border-top-color:var(--earth)}
+.stat.water{border-top-color:var(--water)}
+.stat.fence{border-top-color:var(--fence)}
+.stat-num{font-size:24px;font-weight:700;line-height:1}
+.stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;margin-top:3px}
+#map{height:420px;border-radius:8px;border:1px solid var(--divider)}
+.map-toolbar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.filter-btn{padding:5px 10px;font-size:9px;font-weight:600;text-transform:uppercase;background:transparent;border:1px solid var(--divider);border-radius:4px;color:var(--muted);cursor:pointer}
+.filter-btn.active{background:rgba(101,163,13,0.2);border-color:var(--grass);color:var(--grass-light)}
+.time-box{background:var(--forest-mid);border:1px solid var(--divider);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px}
+.time-box input[type=range]{flex:1;-webkit-appearance:none;height:6px;background:var(--forest);border-radius:3px}
+.time-box input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:var(--grass);border-radius:50%;cursor:pointer}
+.time-display{font-size:12px;min-width:80px;text-align:right;color:var(--amber)}
+.play-btn{width:28px;height:28px;border-radius:50%;background:var(--grass);border:none;color:var(--parchment);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.play-btn svg{width:12px;height:12px}
+.legend{display:flex;gap:14px;margin-top:10px;font-size:10px;color:var(--muted);flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:4px}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px 10px;color:var(--amber);font-size:9px;font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--divider);background:rgba(0,0,0,0.1)}
+td{padding:10px;border-bottom:1px solid rgba(77,124,15,0.2)}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:rgba(101,163,13,0.08)}
+.badge{display:inline-block;padding:2px 7px;font-size:9px;font-weight:600;border-radius:10px;text-transform:uppercase}
+.badge-grazing{background:rgba(101,163,13,0.25);color:var(--grass-light)}
+.badge-ready{background:rgba(212,160,48,0.25);color:var(--amber)}
+.badge-recovering{background:rgba(107,114,128,0.25);color:var(--muted)}
+.badge-good{background:rgba(101,163,13,0.2);color:var(--grass-light)}
+.badge-attention{background:rgba(212,160,48,0.2);color:var(--amber)}
+.badge-treatment{background:rgba(220,38,38,0.2);color:#f87171}
+.tabs{display:flex;gap:3px;margin-bottom:14px;border-bottom:1px solid var(--divider);padding-bottom:6px;overflow-x:auto}
+.tab{padding:6px 12px;font-size:10px;font-weight:600;color:var(--muted);background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--parchment)}
+.tab.active{background:rgba(101,163,13,0.15);border-color:var(--grass);color:var(--grass-light)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.herd-card{background:rgba(0,0,0,0.15);border:1px solid var(--divider);border-radius:8px;padding:12px;margin-bottom:10px}
+.herd-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.herd-name{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.herd-dot{width:12px;height:12px;border-radius:50%}
+.herd-meta{font-size:11px;color:var(--muted)}
+.herd-location{font-size:11px;color:var(--amber);margin-top:5px;display:flex;align-items:center;gap:4px}
+.herd-groups{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.group-tag{background:rgba(101,163,13,0.15);border:1px solid var(--grass);border-radius:4px;padding:3px 8px;font-size:10px;color:var(--grass-light)}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:9px;font-weight:600;text-transform:uppercase;color:var(--amber);margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 11px;background:rgba(0,0,0,0.2);border:1px solid var(--divider);border-radius:6px;color:var(--parchment);font-size:13px}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--grass)}
+.form-group select option{background:var(--forest-mid)}
+.form-group textarea{resize:vertical;min-height:50px;font-family:inherit}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.calc-result{background:rgba(202,138,4,0.15);border:1px solid var(--hay);border-radius:8px;padding:14px;text-align:center}
+.calc-result-num{font-size:28px;font-weight:700;color:var(--hay)}
+.calc-result-lbl{font-size:9px;color:var(--muted);text-transform:uppercase}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:500;align-items:center;justify-content:center;padding:16px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--forest-mid);border:1px solid var(--divider);border-radius:8px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto}
+.modal-header{padding:12px 14px;border-bottom:1px solid var(--divider);background:rgba(0,0,0,0.15);display:flex;align-items:center;gap:10px;position:sticky;top:0}
+.modal-header h2{font-size:15px;font-weight:600}
+.modal-close{position:absolute;right:10px;top:8px;background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:4px}
+.modal-close:hover{color:var(--parchment)}
+.modal-body{padding:14px}
+.selection-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--forest-mid);border-top:2px solid var(--grass);padding:12px 16px;z-index:200}
+.selection-bar.active{display:flex;justify-content:center}
+.selection-content{display:flex;align-items:center;gap:14px;max-width:500px}
+.selection-info h4{font-size:14px;margin-bottom:2px}
+.selection-info p{font-size:11px;color:var(--muted)}
+.voice-panel{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--forest-mid);border-top:2px solid var(--amber);padding:14px;z-index:300}
+.voice-panel.active{display:block}
+.voice-transcript{background:rgba(0,0,0,0.3);border:1px solid var(--divider);border-radius:6px;padding:12px;min-height:40px;margin:10px 0;font-size:13px}
+.voice-transcript.listening{border-color:var(--amber);animation:pulse 1.5s infinite}
+.voice-hints{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.voice-hint{background:rgba(212,160,48,0.15);border:1px solid var(--amber);border-radius:14px;padding:3px 10px;font-size:10px;color:var(--amber)}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--grass);color:var(--parchment);padding:10px 20px;border-radius:8px;font-size:12px;font-weight:600;z-index:999;transition:transform 0.3s;display:flex;align-items:center;gap:8px}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.leaflet-popup-content-wrapper{background:var(--forest-mid)!important;color:var(--parchment)!important;border-radius:8px!important}
+.leaflet-popup-tip{background:var(--forest-mid)!important}
+.leaflet-popup-content{margin:10px 12px!important}
+.leaflet-popup-content h4{margin:0 0 5px;font-size:13px}
+.leaflet-popup-content p{margin:2px 0;font-size:11px;color:var(--muted)}
+.popup-btn{display:inline-block;margin-top:6px;padding:4px 8px;background:var(--grass);color:var(--parchment);border-radius:4px;font-size:9px;font-weight:600;text-transform:uppercase;cursor:pointer;border:none}
+.density-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.toggle-switch{position:relative;width:44px;height:24px;background:rgba(0,0,0,0.3);border-radius:12px;cursor:pointer;transition:background 0.3s}
+.toggle-switch.active{background:var(--grass)}
+.toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--parchment);border-radius:50%;transition:transform 0.3s}
+.toggle-switch.active::after{transform:translateX(20px)}
+.module-row{display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(0,0,0,0.15);border-radius:6px;margin-bottom:8px}
+.module-name{font-size:13px;font-weight:500}
+.geo-thumb{width:40px;height:30px;background:var(--forest);border:1px solid var(--divider);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.geo-thumb:hover{border-color:var(--grass)}
+.geo-thumb svg{width:28px;height:20px}
+.edit-panel{background:rgba(0,0,0,0.3);border:1px solid var(--divider);border-radius:8px;padding:12px;margin-bottom:12px}
+.edit-panel-title{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.edit-options{display:flex;flex-wrap:wrap;gap:6px}
+.edit-option{padding:8px 12px;background:var(--forest-mid);border:1px solid var(--divider);border-radius:6px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.edit-option:hover{border-color:var(--grass);color:var(--grass-light)}
+.edit-option.active{background:rgba(101,163,13,0.2);border-color:var(--grass);color:var(--grass-light)}
+.edit-option svg{width:16px;height:16px}
+.admin-section{background:rgba(0,0,0,0.2);border:1px solid var(--divider);border-radius:8px;padding:14px;margin-bottom:14px}
+.admin-title{font-size:12px;font-weight:600;color:var(--amber);margin-bottom:10px;text-transform:uppercase;letter-spacing:0.5px}
+@media(max-width:768px){.form-row{grid-template-columns:1fr}#map{height:320px}.stats{grid-template-columns:repeat(2,1fr)}.form-row-3{grid-template-columns:1fr}}
+@media(max-width:500px){.brand-name{display:none}.nav-btn span{display:none}.nav-btn{min-width:36px;padding:6px}#content{padding:10px}}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="brand">
+    <div class="brand-icon">🌿</div>
+    <div class="brand-name">Tuckaway</div>
+  </div>
+  <div class="nav">
+    <button class="nav-btn active" data-page="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Home</span></button>
+    <button class="nav-btn" data-page="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg><span>Map</span></button>
+    <button class="nav-btn" data-page="paddocks"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg><span>Paddocks</span></button>
+    <button class="nav-btn" data-page="herds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/></svg><span>Herds</span></button>
+    <button class="nav-btn" data-page="animals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 4.5c-1.5 0-2.5 1.5-2.5 3s1 2.5 2.5 2.5 2.5-1 2.5-2.5-1-3-2.5-3z"/><ellipse cx="6" cy="7" rx="2" ry="1.5"/><ellipse cx="18" cy="7" rx="2" ry="1.5"/><path d="M4 13c0 4.4 3.6 8 8 8s8-3.6 8-8"/></svg><span>Animals</span></button>
+    <button class="nav-btn" data-page="fence"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M12 4v16M20 4v16M4 8h8M12 8h8M4 14h8M12 14h8"/></svg><span>Fence</span></button>
+    <button class="nav-btn" data-page="water"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg><span>Water</span></button>
+    <button class="nav-btn" data-page="hay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg><span>Hay</span></button>
+    <button class="nav-btn" data-page="health"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>Health</span></button>
+    <button class="nav-btn" data-page="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Admin</span></button>
+  </div>
+  <div class="topbar-actions">
+    <button class="icon-btn" id="voice-btn" onclick="toggleVoice()" title="Voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4m-4 0h8"/></svg></button>
+    <button class="icon-btn" onclick="exportFarmOS()" title="Export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>
+  </div>
+</div>
+
+<div id="content">
+  <!-- DASHBOARD -->
+  <section id="page-dashboard" class="page active">
+    <div class="page-header">
+      <div><h1 class="page-title">Grazing Dashboard</h1><p class="page-sub" id="season-status">Grazing Season Active</p></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="openModal('feed-hay')">Feed Hay</button>
+        <button class="btn btn-green" onclick="openModal('quick-move')">Move Herd</button>
+      </div>
+    </div>
+    <div class="stats" id="dashboard-stats"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="card"><div class="card-header"><span class="card-title">Active Grazing</span></div><div class="card-body" id="active-grazing"></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">Recent Activity</span></div><div class="card-body" id="recent-activity"></div></div>
+    </div>
+    <div class="card"><div class="card-header"><span class="card-title">Forage Status</span></div><div class="card-body" id="forage-bars"></div></div>
+  </section>
+
+  <!-- MAP -->
+  <section id="page-map" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Grazing Map</h1><p class="page-sub">Tap herd → tap paddock to move</p></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="openModal('take-reading')">Reading</button>
+      </div>
+    </div>
+    <div class="edit-panel" id="edit-panel">
+      <div class="edit-panel-title">Add / Edit Features</div>
+      <div class="edit-options">
+        <div class="edit-option" onclick="startAddPaddock()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Paddock</div>
+        <div class="edit-option" onclick="startAddFence('permanent')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M20 4v16M4 12h16"/></svg>Permanent Fence</div>
+        <div class="edit-option" onclick="startAddFence('portable')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v16M20 4v16M4 12h16" stroke-dasharray="4 2"/></svg>Portable Fence</div>
+        <div class="edit-option" onclick="startAddGate()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><circle cx="7" cy="12" r="1"/></svg>Gate</div>
+        <div class="edit-option" onclick="startAddWater()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>Water Point</div>
+      </div>
+    </div>
+    <div class="time-box">
+      <button class="play-btn" id="play-btn" onclick="togglePlay()"><svg viewBox="0 0 24 24" fill="currentColor" id="play-icon"><polygon points="5,3 19,12 5,21"/></svg></button>
+      <span style="font-size:10px;color:var(--amber);text-transform:uppercase;font-weight:600">Timeline</span>
+      <input type="range" id="time-slider" min="0" max="365" value="365">
+      <span class="time-display" id="time-display">Current</span>
+    </div>
+    <div class="map-toolbar">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="grazing">Grazing</button>
+      <button class="filter-btn" data-filter="ready">Ready</button>
+      <button class="filter-btn" data-filter="recovering">Recovering</button>
+      <span style="margin-left:auto;font-size:10px;color:var(--muted)">
+        <label><input type="checkbox" id="show-fences" checked onchange="toggleFenceLayer()"> Fences</label>
+        <label style="margin-left:8px"><input type="checkbox" id="show-water" checked onchange="toggleWaterLayer()"> Water</label>
+      </span>
+    </div>
+    <div id="map"></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#65a30d"></div>Grazing</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#d4a030"></div>Ready</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#6b7280"></div>Recovering</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#0ea5e9;border-radius:50%"></div>Water</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316;height:3px"></div>Portable</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#78350f;height:3px"></div>Permanent</div>
+    </div>
+  </section>
+
+  <!-- PADDOCKS -->
+  <section id="page-paddocks" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Paddocks</h1><p class="page-sub">Click row to edit · Click geometry to edit on map</p></div>
+      <button class="btn btn-green" onclick="startAddPaddock()">Add Paddock</button>
+    </div>
+    <div class="card"><div class="card-body" style="overflow-x:auto">
+      <table><thead><tr><th style="width:50px">Map</th><th></th><th>Name</th><th>Acres</th><th>Type</th><th>Forage</th><th>Status</th><th>Last Grazed</th></tr></thead><tbody id="paddocks-tbody"></tbody></table>
+    </div></div>
+  </section>
+
+  <!-- HERDS -->
+  <section id="page-herds" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Herds & Groups</h1></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="openModal('add-group')">Add Group</button>
+        <button class="btn btn-green" onclick="openModal('add-herd')">Add Herd</button>
+      </div>
+    </div>
+    <div id="herds-list"></div>
+  </section>
+
+  <!-- ANIMALS -->
+  <section id="page-animals" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Individual Animals</h1></div>
+      <button class="btn btn-green" onclick="openModal('add-animal')">Add Animal</button>
+    </div>
+    <div class="tabs" id="animal-tabs"><div class="tab active" data-species="all">All</div></div>
+    <div class="card"><div class="card-body" style="overflow-x:auto">
+      <table><thead><tr><th>Tag</th><th>Name</th><th>Species</th><th>Breed</th><th>Sex</th><th>Weight</th><th>Herd</th><th>Health</th></tr></thead><tbody id="animals-tbody"></tbody></table>
+    </div></div>
+  </section>
+
+  <!-- FENCE -->
+  <section id="page-fence" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Fence Management</h1><p class="page-sub">Equipment, perimeter, gates & tasks</p></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="openModal('add-fence-task')">Add Task</button>
+        <button class="btn btn-fence" onclick="openModal('add-fence-equipment')">Add Equipment</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="fence-equipment">Equipment</div>
+      <div class="tab" data-tab="fence-lines">Fence Lines</div>
+      <div class="tab" data-tab="fence-gates">Gates</div>
+      <div class="tab" data-tab="fence-tasks">Tasks & Logs</div>
+    </div>
+    <div class="tab-content active" id="tab-fence-equipment">
+      <div class="stats" id="fence-stats"></div>
+      <div class="card"><div class="card-header"><span class="card-title">Portable Equipment Inventory</span></div><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Type</th><th>Qty</th><th>Location</th><th>Condition</th><th>Notes</th><th></th></tr></thead><tbody id="fence-equip-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-fence-lines">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Name</th><th>Type</th><th>Length</th><th>Condition</th><th>Last Check</th><th></th></tr></thead><tbody id="fence-lines-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-fence-gates">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Name</th><th>Location</th><th>Type</th><th>Condition</th><th>Notes</th><th></th></tr></thead><tbody id="fence-gates-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-fence-tasks">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Date</th><th>Type</th><th>Location</th><th>Status</th><th>Notes</th></tr></thead><tbody id="fence-tasks-tbody"></tbody></table>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- WATER -->
+  <section id="page-water" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Water & Irrigation</h1><p class="page-sub">Water points, tanks, irrigation tasks</p></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="openModal('add-water-task')">Add Task</button>
+        <button class="btn btn-water" onclick="openModal('add-water-point')">Add Source</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="water-sources">Sources</div>
+      <div class="tab" data-tab="water-equipment">Equipment</div>
+      <div class="tab" data-tab="water-tasks">Tasks & Logs</div>
+    </div>
+    <div class="tab-content active" id="tab-water-sources">
+      <div class="stats" id="water-stats"></div>
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Name</th><th>Type</th><th>Paddocks Served</th><th>Capacity</th><th>Status</th><th></th></tr></thead><tbody id="water-sources-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-water-equipment">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Type</th><th>Qty</th><th>Location</th><th>Condition</th><th>Notes</th></tr></thead><tbody id="water-equip-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-water-tasks">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Date</th><th>Type</th><th>Location</th><th>Status</th><th>Notes</th></tr></thead><tbody id="water-tasks-tbody"></tbody></table>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- HAY -->
+  <section id="page-hay" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Hay Inventory</h1><p class="page-sub">FarmOS Inventory Module Compatible</p></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="openModal('feed-hay')">Feed</button>
+        <button class="btn btn-hay" onclick="openModal('add-hay')">Add Hay</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="hay-inventory">Inventory</div>
+      <div class="tab" data-tab="hay-feeding">Feeding Log</div>
+      <div class="tab" data-tab="hay-calc">Calculator</div>
+    </div>
+    <div class="tab-content active" id="tab-hay-inventory">
+      <div class="stats" id="hay-stats"></div>
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Type</th><th>Cut</th><th>Qty</th><th>Weight</th><th>Tons</th><th>Quality</th><th>Location</th><th></th></tr></thead><tbody id="hay-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-hay-feeding">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Date</th><th>Herd</th><th>Bales</th><th>Type</th><th>Lbs</th><th>Notes</th></tr></thead><tbody id="feeding-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-hay-calc">
+      <div class="card"><div class="card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px">
+          <div class="form-group"><label>Animal Units</label><input type="number" id="calc-au" readonly style="background:var(--forest)"></div>
+          <div class="form-group"><label>Lbs/AU/Day</label><input type="number" id="calc-lbs" value="26" onchange="calcHay()"></div>
+          <div class="form-group"><label>Feeding Days</label><input type="number" id="calc-days" value="180" onchange="calcHay()"></div>
+          <div class="form-group"><label>Waste %</label><input type="number" id="calc-waste" value="15" onchange="calcHay()"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="hay-calc-results"></div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- HEALTH -->
+  <section id="page-health" class="page">
+    <div class="page-header">
+      <div><h1 class="page-title">Health & Observations</h1></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="openModal('add-observation')">Observation</button>
+        <button class="btn btn-green" onclick="openModal('add-health')">Health Record</button>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="health-records">Health Records</div>
+      <div class="tab" data-tab="field-obs">Field Observations</div>
+    </div>
+    <div class="tab-content active" id="tab-health-records">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Date</th><th>Animal</th><th>Type</th><th>Condition</th><th>Notes</th><th>Withdrawal</th></tr></thead><tbody id="health-tbody"></tbody></table>
+      </div></div>
+    </div>
+    <div class="tab-content" id="tab-field-obs">
+      <div class="card"><div class="card-body" style="overflow-x:auto">
+        <table><thead><tr><th>Date</th><th>Paddock</th><th>Type</th><th>Notes</th></tr></thead><tbody id="obs-tbody"></tbody></table>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ADMIN -->
+  <section id="page-admin" class="page">
+    <div class="page-header"><h1 class="page-title">Admin & Settings</h1></div>
+    
+    <div class="admin-section">
+      <div class="admin-title">Livestock Modules</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:12px">Enable animal types for your farm</p>
+      <div id="modules-list"></div>
+    </div>
+    
+    <div class="admin-section">
+      <div class="admin-title">Hay Settings & Assumptions</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px" id="hay-settings">
+        <div class="form-group"><label>Round Bale 4x5 Weight (lbs)</label><input type="number" id="setting-round45" value="850" onchange="saveSettings()"></div>
+        <div class="form-group"><label>Round Bale 5x5 Weight (lbs)</label><input type="number" id="setting-round55" value="1100" onchange="saveSettings()"></div>
+        <div class="form-group"><label>Small Square Weight (lbs)</label><input type="number" id="setting-smallsq" value="45" onchange="saveSettings()"></div>
+        <div class="form-group"><label>Large Square 3x4 Weight (lbs)</label><input type="number" id="setting-largesq" value="1200" onchange="saveSettings()"></div>
+        <div class="form-group"><label>Typical Cuts per Year</label><input type="number" id="setting-cuts" value="2" onchange="saveSettings()"></div>
+        <div class="form-group"><label>Default Waste %</label><input type="number" id="setting-waste" value="15" onchange="saveSettings()"></div>
+      </div>
+    </div>
+    
+    <div class="admin-section">
+      <div class="admin-title">Storage Locations</div>
+      <div class="card" style="margin:0"><div class="card-body">
+        <div id="storage-locations"></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="openModal('add-location')">+ Add Location</button>
+      </div></div>
+    </div>
+    
+    <div class="admin-section">
+      <div class="admin-title">Field Locations (Hay Production)</div>
+      <div class="card" style="margin:0"><div class="card-body">
+        <div id="field-locations"></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="openModal('add-field')">+ Add Field</button>
+      </div></div>
+    </div>
+    
+    <div class="admin-section">
+      <div class="admin-title">Data Export</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px">FarmOS JSON:API compatible export with Inventory Module support</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="exportFarmOS()">Export FarmOS JSON</button>
+        <button class="btn btn-outline" onclick="exportGeoJSON()">Export GeoJSON</button>
+        <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">Import</button>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+        <button class="btn btn-danger btn-sm" onclick="clearAllData()">Reset All Data</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- SELECTION BAR -->
+<div class="selection-bar" id="selection-bar">
+  <div class="selection-content">
+    <div class="selection-info"><h4 id="selection-herd-name">Sheep Flock</h4><p>Tap a paddock to move</p></div>
+    <button class="btn btn-outline" onclick="cancelSelection()">Cancel</button>
+  </div>
+</div>
+
+<!-- VOICE PANEL -->
+<div class="voice-panel" id="voice-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <span style="font-size:14px;font-weight:600">Voice Input</span>
+    <button onclick="closeVoice()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">&times;</button>
+  </div>
+  <div class="voice-transcript" id="voice-transcript">Tap record and speak...</div>
+  <div class="voice-hints">
+    <span class="voice-hint">"Move sheep to Hawk Field"</span>
+    <span class="voice-hint">"Feed 2 bales to beef"</span>
+    <span class="voice-hint">"Reading 8 inches medium"</span>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:center">
+    <button class="btn" style="background:var(--amber);color:#1a1a1a" id="voice-record-btn" onclick="toggleRecording()">Start Recording</button>
+    <button class="btn btn-green" id="voice-confirm-btn" onclick="confirmVoice()" style="display:none">Confirm</button>
+  </div>
+</div>
+
+<!-- Quick Move Modal -->
+<div class="modal-overlay" id="modal-quick-move">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('quick-move')">&times;</button>
+    <div class="modal-header"><h2>Move Herd</h2></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Select Herd</label><select id="move-herd"></select></div>
+      <div class="form-group"><label>Move To Paddock</label><select id="move-paddock"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Move Date</label><input type="date" id="move-date"></div>
+        <div class="form-group"><label>Planned Days</label><input type="number" id="move-days" value="3" min="1"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="move-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('quick-move')">Cancel</button>
+        <button class="btn btn-green" onclick="saveMove()">Move</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Feed Hay Modal -->
+<div class="modal-overlay" id="modal-feed-hay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('feed-hay')">&times;</button>
+    <div class="modal-header"><h2>Feed Hay</h2></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Select Herd</label><select id="feed-herd"></select></div>
+      <div class="form-group"><label>Hay Source</label><select id="feed-source"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Bales</label><input type="number" id="feed-bales" value="1" min="1"></div>
+        <div class="form-group"><label>Date</label><input type="date" id="feed-date"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="feed-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('feed-hay')">Cancel</button>
+        <button class="btn btn-hay" onclick="saveFeed()">Feed</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Paddock Modal (Step 1: Details) -->
+<div class="modal-overlay" id="modal-add-paddock">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-paddock')">&times;</button>
+    <div class="modal-header"><h2 id="paddock-modal-title">Add Paddock</h2></div>
+    <div class="modal-body">
+      <input type="hidden" id="paddock-edit-id">
+      <div class="form-row">
+        <div class="form-group"><label>Name</label><input type="text" id="paddock-name" placeholder="e.g., North Pasture"></div>
+        <div class="form-group"><label>Acres (auto-calc from geometry)</label><input type="number" id="paddock-acres" step="0.1"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Type</label><select id="paddock-type"><option value="graze">Rotational</option><option value="silvopasture">Silvopasture</option><option value="hay">Hay Only</option><option value="sacrifice">Sacrifice</option></select></div>
+        <div class="form-group"><label>Color</label><input type="color" id="paddock-color" value="#65a30d" style="height:40px"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="paddock-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-danger" id="paddock-delete-btn" onclick="deletePaddock()" style="display:none">Delete</button>
+        <button class="btn btn-outline" onclick="closeModal('add-paddock')">Cancel</button>
+        <button class="btn btn-green" onclick="savePaddockAndDraw()">Next: Draw on Map</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Animal Modal -->
+<div class="modal-overlay" id="modal-add-animal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-animal')">&times;</button>
+    <div class="modal-header"><h2 id="animal-modal-title">Add Animal</h2></div>
+    <div class="modal-body">
+      <input type="hidden" id="animal-edit-id">
+      <div class="form-row">
+        <div class="form-group"><label>Tag ID</label><input type="text" id="animal-tag" placeholder="e.g., 2024-047"></div>
+        <div class="form-group"><label>Name</label><input type="text" id="animal-name"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Species</label><select id="animal-species" onchange="updateBreeds()"></select></div>
+        <div class="form-group"><label>Breed</label><select id="animal-breed"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Sex</label><select id="animal-sex"><option value="female">Female</option><option value="male">Male</option><option value="wether">Wether/Steer</option></select></div>
+        <div class="form-group"><label>Weight (lbs)</label><input type="number" id="animal-weight" value="150"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Birth Date</label><input type="date" id="animal-birthdate"></div>
+        <div class="form-group"><label>Status</label><select id="animal-status"><option value="active">Active</option><option value="breeding">Breeding</option><option value="pregnant">Pregnant</option><option value="nursing">Nursing</option><option value="growing">Growing</option><option value="culled">Culled</option></select></div>
+      </div>
+      <div class="form-group"><label>Assign to Herd</label><select id="animal-herd"></select></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-danger" id="animal-delete-btn" onclick="deleteAnimal()" style="display:none">Delete</button>
+        <button class="btn btn-outline" onclick="closeModal('add-animal')">Cancel</button>
+        <button class="btn btn-green" onclick="saveAnimal()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Herd Modal -->
+<div class="modal-overlay" id="modal-add-herd">
+  <div class="modal" style="max-width:360px">
+    <button class="modal-close" onclick="closeModal('add-herd')">&times;</button>
+    <div class="modal-header"><h2>Add Herd</h2></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Herd Name</label><input type="text" id="herd-name" placeholder="e.g., Main Flock"></div>
+      <div class="form-group"><label>Color</label><input type="color" id="herd-color" value="#65a30d" style="height:40px"></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-herd')">Cancel</button>
+        <button class="btn btn-green" onclick="saveHerd()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Group Modal -->
+<div class="modal-overlay" id="modal-add-group">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-group')">&times;</button>
+    <div class="modal-header"><h2>Add Animal Group</h2></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Group Name</label><input type="text" id="group-name" placeholder="e.g., 2024 Lambs"></div>
+        <div class="form-group"><label>Type</label><select id="group-type"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Count</label><input type="number" id="group-count" value="10"></div>
+        <div class="form-group"><label>Avg Weight (lbs)</label><input type="number" id="group-weight" value="150"></div>
+      </div>
+      <div class="form-group"><label>Assign to Herd</label><select id="group-herd"></select></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-group')">Cancel</button>
+        <button class="btn btn-green" onclick="saveGroup()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Take Reading Modal -->
+<div class="modal-overlay" id="modal-take-reading">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('take-reading')">&times;</button>
+    <div class="modal-header"><h2>Forage Reading</h2></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Paddock</label><select id="reading-paddock"></select></div>
+      <div class="form-group"><label>Height: <span id="reading-height-val">10</span>"</label><input type="range" id="reading-height" min="2" max="24" step="0.5" value="10" style="width:100%" oninput="updateReading()"></div>
+      <div class="form-group"><label>Density</label>
+        <div class="density-btns">
+          <button class="filter-btn" data-density="high" onclick="setDensity('high')">High</button>
+          <button class="filter-btn active" data-density="medium" onclick="setDensity('medium')">Medium</button>
+          <button class="filter-btn" data-density="low" onclick="setDensity('low')">Low</button>
+        </div>
+      </div>
+      <div class="calc-result" style="margin:12px 0;border-color:var(--grass);background:rgba(101,163,13,0.15)">
+        <div class="calc-result-num" id="reading-dm" style="color:var(--grass-light)">1200</div>
+        <div class="calc-result-lbl">Est. lbs DM/acre</div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="reading-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('take-reading')">Cancel</button>
+        <button class="btn btn-green" onclick="saveReading()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Hay Modal -->
+<div class="modal-overlay" id="modal-add-hay">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-hay')">&times;</button>
+    <div class="modal-header"><h2>Add Hay</h2></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Bale Type</label><select id="hay-type" onchange="updateHayWeight()"><option value="round_4x5">Round 4x5</option><option value="round_5x5">Round 5x5</option><option value="square_small">Small Square</option><option value="square_3x4">Large 3x4</option></select></div>
+        <div class="form-group"><label>Cut</label><select id="hay-cut"><option value="first">First Cut</option><option value="second">Second Cut</option><option value="third">Third Cut</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Quantity</label><input type="number" id="hay-qty" value="20"></div>
+        <div class="form-group"><label>Weight/Bale (lbs)</label><input type="number" id="hay-weight" value="850"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Quality</label><select id="hay-quality"><option value="excellent">Excellent</option><option value="good">Good</option><option value="fair">Fair</option><option value="poor">Poor</option></select></div>
+        <div class="form-group"><label>Storage Location</label><select id="hay-location"></select></div>
+      </div>
+      <div class="form-group"><label>Field Source</label><select id="hay-field"></select></div>
+      <div class="form-group"><label>Notes</label><textarea id="hay-notes" rows="2" placeholder="Moisture %, color, smell, etc."></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-hay')">Cancel</button>
+        <button class="btn btn-hay" onclick="saveHay()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Health Modal -->
+<div class="modal-overlay" id="modal-add-health">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-health')">&times;</button>
+    <div class="modal-header"><h2 id="health-modal-title">Health Record</h2></div>
+    <div class="modal-body">
+      <input type="hidden" id="health-edit-id">
+      <div class="form-group"><label>Animal(s)</label><select id="health-animal" onchange="updateConditions()"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Type</label><select id="health-type" onchange="updateConditions()"><option value="observation">Observation</option><option value="vaccination">Vaccination</option><option value="deworming">Deworming</option><option value="hoof_trim">Hoof Trim</option><option value="illness">Illness</option><option value="injury">Injury</option><option value="treatment">Treatment</option><option value="famacha">FAMACHA</option></select></div>
+        <div class="form-group"><label>Severity</label><select id="health-severity"><option value="routine">Routine</option><option value="attention">Attention</option><option value="urgent">Urgent</option></select></div>
+      </div>
+      <div class="form-group"><label>Condition</label><select id="health-condition"></select></div>
+      <div class="form-row">
+        <div class="form-group"><label>Date</label><input type="date" id="health-date"></div>
+        <div class="form-group"><label>Withdrawal Days</label><input type="number" id="health-withdrawal" value="0"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="health-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-danger" id="health-delete-btn" onclick="deleteHealth()" style="display:none">Delete</button>
+        <button class="btn btn-outline" onclick="closeModal('add-health')">Cancel</button>
+        <button class="btn btn-green" onclick="saveHealth()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Observation Modal -->
+<div class="modal-overlay" id="modal-add-observation">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-observation')">&times;</button>
+    <div class="modal-header"><h2 id="obs-modal-title">Field Observation</h2></div>
+    <div class="modal-body">
+      <input type="hidden" id="obs-edit-id">
+      <div class="form-row">
+        <div class="form-group"><label>Paddock</label><select id="obs-paddock"></select></div>
+        <div class="form-group"><label>Type</label><select id="obs-type"><option value="forage">Forage</option><option value="fence">Fence</option><option value="water">Water</option><option value="wildlife">Wildlife</option><option value="weed">Weed/Pest</option><option value="other">Other</option></select></div>
+      </div>
+      <div class="form-group"><label>Date</label><input type="date" id="obs-date"></div>
+      <div class="form-group"><label>Notes</label><textarea id="obs-notes" rows="3"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-danger" id="obs-delete-btn" onclick="deleteObs()" style="display:none">Delete</button>
+        <button class="btn btn-outline" onclick="closeModal('add-observation')">Cancel</button>
+        <button class="btn btn-green" onclick="saveObs()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fence Equipment Modal -->
+<div class="modal-overlay" id="modal-add-fence-equipment">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-fence-equipment')">&times;</button>
+    <div class="modal-header"><h2>Add Fence Equipment</h2></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Type</label><select id="fence-equip-type"><option value="charger">Energizer/Charger</option><option value="polywire">Polywire Reel</option><option value="posts">Step-in Posts</option><option value="netting">ElectroNet</option><option value="tape">Electric Tape</option><option value="ground_rod">Ground Rod</option><option value="tester">Fence Tester</option><option value="other">Other</option></select></div>
+        <div class="form-group"><label>Quantity</label><input type="number" id="fence-equip-qty" value="1"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Location</label><input type="text" id="fence-equip-location" placeholder="e.g., Barn, Hawk Field"></div>
+        <div class="form-group"><label>Condition</label><select id="fence-equip-condition"><option value="good">Good</option><option value="fair">Fair</option><option value="poor">Poor</option><option value="repair">Needs Repair</option></select></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="fence-equip-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-fence-equipment')">Cancel</button>
+        <button class="btn btn-fence" onclick="saveFenceEquipment()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fence Task Modal -->
+<div class="modal-overlay" id="modal-add-fence-task">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-fence-task')">&times;</button>
+    <div class="modal-header"><h2>Fence Task/Observation</h2></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Type</label><select id="fence-task-type"><option value="inspection">Inspection</option><option value="repair">Repair</option><option value="install">Installation</option><option value="move">Move Portable</option><option value="clear">Clear Vegetation</option><option value="observation">Observation</option></select></div>
+        <div class="form-group"><label>Status</label><select id="fence-task-status"><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="done">Done</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Location/Fence Line</label><input type="text" id="fence-task-location"></div>
+        <div class="form-group"><label>Date</label><input type="date" id="fence-task-date"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="fence-task-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-fence-task')">Cancel</button>
+        <button class="btn btn-green" onclick="saveFenceTask()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Water Point Modal -->
+<div class="modal-overlay" id="modal-add-water-point">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-water-point')">&times;</button>
+    <div class="modal-header"><h2>Add Water Source</h2></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Name</label><input type="text" id="water-name" placeholder="e.g., North Tank"></div>
+        <div class="form-group"><label>Type</label><select id="water-type"><option value="tank">Tank</option><option value="trough">Trough</option><option value="pond">Pond</option><option value="stream">Stream</option><option value="well">Well</option><option value="hydrant">Hydrant</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Capacity (gal)</label><input type="number" id="water-capacity" placeholder="Optional"></div>
+        <div class="form-group"><label>Status</label><select id="water-status"><option value="active">Active</option><option value="seasonal">Seasonal</option><option value="offline">Offline</option></select></div>
+      </div>
+      <div class="form-group"><label>Paddocks Served</label><input type="text" id="water-paddocks" placeholder="e.g., Hawk Field, James Field"></div>
+      <div class="form-group"><label>Notes</label><textarea id="water-notes" rows="2"></textarea></div>
+      <p style="font-size:10px;color:var(--muted);margin-top:8px">After saving, you can place this on the map using Edit mode.</p>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-water-point')">Cancel</button>
+        <button class="btn btn-water" onclick="saveWaterPoint()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Water Task Modal -->
+<div class="modal-overlay" id="modal-add-water-task">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-water-task')">&times;</button>
+    <div class="modal-header"><h2>Water Task/Observation</h2></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Type</label><select id="water-task-type"><option value="check">Check/Inspect</option><option value="fill">Fill/Refill</option><option value="clean">Clean</option><option value="repair">Repair</option><option value="move">Move Equipment</option><option value="observation">Observation</option></select></div>
+        <div class="form-group"><label>Status</label><select id="water-task-status"><option value="pending">Pending</option><option value="in_progress">In Progress</option><option value="done">Done</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Location</label><select id="water-task-location"></select></div>
+        <div class="form-group"><label>Date</label><input type="date" id="water-task-date"></div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="water-task-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-water-task')">Cancel</button>
+        <button class="btn btn-green" onclick="saveWaterTask()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Location Modal -->
+<div class="modal-overlay" id="modal-add-location">
+  <div class="modal" style="max-width:360px">
+    <button class="modal-close" onclick="closeModal('add-location')">&times;</button>
+    <div class="modal-header"><h2>Add Storage Location</h2></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Location Name</label><input type="text" id="location-name" placeholder="e.g., Main Barn, Hay Shed"></div>
+      <div class="form-group"><label>Notes</label><textarea id="location-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-location')">Cancel</button>
+        <button class="btn btn-green" onclick="saveLocation()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Field Modal -->
+<div class="modal-overlay" id="modal-add-field">
+  <div class="modal" style="max-width:360px">
+    <button class="modal-close" onclick="closeModal('add-field')">&times;</button>
+    <div class="modal-header"><h2>Add Hay Field</h2></div>
+    <div class="modal-body">
+      <div class="form-group"><label>Field Name</label><input type="text" id="field-name" placeholder="e.g., South Hayfield"></div>
+      <div class="form-group"><label>Acres</label><input type="number" id="field-acres" step="0.1"></div>
+      <div class="form-group"><label>Notes</label><textarea id="field-notes" rows="2"></textarea></div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('add-field')">Cancel</button>
+        <button class="btn btn-green" onclick="saveField()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Move Modal -->
+<div class="modal-overlay" id="modal-confirm-move">
+  <div class="modal" style="max-width:380px">
+    <button class="modal-close" onclick="closeModal('confirm-move');cancelSelection()">&times;</button>
+    <div class="modal-header"><h2>Confirm Move</h2></div>
+    <div class="modal-body">
+      <p id="confirm-move-text" style="font-size:13px;margin-bottom:14px"></p>
+      <div class="form-row">
+        <div class="form-group"><label>Move Date</label><input type="date" id="confirm-move-date"></div>
+        <div class="form-group"><label>Planned Days</label><input type="number" id="confirm-move-days" value="3"></div>
+      </div>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-outline" onclick="closeModal('confirm-move');cancelSelection()">Cancel</button>
+        <button class="btn btn-green" onclick="confirmMapMove()">Move</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span id="toast-msg">Saved</span></div>
+
+<script>
+// =============================================
+// KML PADDOCK DATA (all 20 paddocks)
+// =============================================
+var KML_PADDOCKS = [
+  {id:'p1',name:'Cairrage House Pasture',coords:[[-70.976242,43.157514],[-70.976084,43.157374],[-70.976342,43.157064],[-70.976401,43.157090],[-70.976578,43.157285],[-70.976449,43.157407],[-70.976331,43.157473],[-70.976242,43.157514]]},
+  {id:'p2',name:'Cox Crossing Pasture',coords:[[-70.976197,43.157532],[-70.976004,43.157616],[-70.975848,43.157673],[-70.975709,43.157720],[-70.975422,43.157771],[-70.975499,43.157569],[-70.975894,43.157458],[-70.976060,43.157372],[-70.976232,43.157518],[-70.976197,43.157532]]},
+  {id:'p3',name:'Dogleg Field Far',coords:[[-70.967294,43.160957],[-70.967104,43.160911],[-70.966962,43.160999],[-70.966863,43.161249],[-70.966713,43.161330],[-70.966246,43.161817],[-70.966158,43.162095],[-70.966017,43.162259],[-70.965639,43.162436],[-70.965574,43.162541],[-70.965641,43.162851],[-70.966013,43.162636],[-70.966278,43.162522],[-70.966472,43.162236],[-70.966772,43.162089],[-70.967193,43.161210],[-70.967294,43.160957]]},
+  {id:'p4',name:'Dogleg Field Front',coords:[[-70.967214,43.158943],[-70.967161,43.158815],[-70.967136,43.158709],[-70.967542,43.158313],[-70.967542,43.158109],[-70.967593,43.157989],[-70.967935,43.157739],[-70.967886,43.157670],[-70.967770,43.157687],[-70.967379,43.157790],[-70.967093,43.157854],[-70.966983,43.157960],[-70.967020,43.158152],[-70.967064,43.158308],[-70.966891,43.158434],[-70.966573,43.158648],[-70.966265,43.158894],[-70.966522,43.159034],[-70.966857,43.159126],[-70.967086,43.159083],[-70.967214,43.158943]]},
+  {id:'p5',name:'Dogleg Field Middle',coords:[[-70.967962,43.160422],[-70.968278,43.160133],[-70.968349,43.159926],[-70.968307,43.159749],[-70.968022,43.159606],[-70.967830,43.159432],[-70.967428,43.159298],[-70.967202,43.159337],[-70.967279,43.159481],[-70.967277,43.159606],[-70.966760,43.159818],[-70.966733,43.159942],[-70.966725,43.160137],[-70.966587,43.160241],[-70.966583,43.160378],[-70.966663,43.160391],[-70.966856,43.160309],[-70.966930,43.160344],[-70.966983,43.160447],[-70.966889,43.160766],[-70.967154,43.160810],[-70.967438,43.160760],[-70.967962,43.160422]]},
+  {id:'p6',name:'Fairy Hill Silvopasture',coords:[[-70.970867,43.160239],[-70.970470,43.160355],[-70.970105,43.160363],[-70.970073,43.160089],[-70.970169,43.159831],[-70.970201,43.159378],[-70.970212,43.159142],[-70.970491,43.159118],[-70.970588,43.158993],[-70.971907,43.158954],[-70.971725,43.159284],[-70.971360,43.159410],[-70.970867,43.160239]]},
+  {id:'p7',name:'Gibby Field East',coords:[[-70.977038,43.155632],[-70.977405,43.155237],[-70.976975,43.155084],[-70.976959,43.155090],[-70.976686,43.154961],[-70.976685,43.154972],[-70.976408,43.154887],[-70.976052,43.154872],[-70.975940,43.155359],[-70.976407,43.155452],[-70.976737,43.155604],[-70.976832,43.155797],[-70.977038,43.155632]]},
+  {id:'p8',name:'Gibby Field North',coords:[[-70.976747,43.155827],[-70.976530,43.155562],[-70.976213,43.155488],[-70.975943,43.155456],[-70.975854,43.155608],[-70.975849,43.155796],[-70.975918,43.155854],[-70.976239,43.155862],[-70.976747,43.155827]]},
+  {id:'p9',name:'Gibby Field Pond',coords:[[-70.975905,43.155417],[-70.975687,43.155157],[-70.975350,43.155109],[-70.975203,43.155287],[-70.975289,43.155505],[-70.975545,43.155567],[-70.975905,43.155417]]},
+  {id:'p10',name:'Hawk Field',coords:[[-70.972731,43.163420],[-70.972130,43.162810],[-70.972044,43.162567],[-70.971583,43.162066],[-70.972420,43.161620],[-70.972581,43.161722],[-70.974373,43.160767],[-70.974458,43.160970],[-70.974534,43.161103],[-70.974169,43.161667],[-70.974448,43.161902],[-70.974705,43.162293],[-70.974813,43.162450],[-70.974748,43.162590],[-70.973879,43.162982],[-70.972731,43.163420]]},
+  {id:'p11',name:'Hawk Valley',coords:[[-70.971520,43.162004],[-70.971208,43.161652],[-70.970915,43.161390],[-70.970684,43.161509],[-70.970876,43.161820],[-70.971165,43.162070],[-70.971520,43.162004]]},
+  {id:'p12',name:'High Power Pasture',coords:[[-70.972925,43.158889],[-70.972078,43.158138],[-70.972249,43.158083],[-70.974953,43.158059],[-70.975178,43.158302],[-70.974835,43.158826],[-70.974663,43.158913],[-70.974492,43.158905],[-70.972925,43.158889]]},
+  {id:'p13',name:'James Field',coords:[[-70.972486,43.163527],[-70.971796,43.162613],[-70.970992,43.162905],[-70.970619,43.163233],[-70.970321,43.163338],[-70.969890,43.163653],[-70.969748,43.163808],[-70.969848,43.164402],[-70.970000,43.164455],[-70.970320,43.164436],[-70.970729,43.164400],[-70.970987,43.164441],[-70.972486,43.163527]]},
+  {id:'p14',name:'James Meadow',coords:[[-70.969680,43.163760],[-70.969320,43.163520],[-70.968950,43.163680],[-70.969100,43.164020],[-70.969450,43.163950],[-70.969680,43.163760]]},
+  {id:'p15',name:'Kidder Main',coords:[[-70.976787,43.158893],[-70.976498,43.158902],[-70.975706,43.158802],[-70.975286,43.158527],[-70.975116,43.158610],[-70.974981,43.158865],[-70.975852,43.159422],[-70.976497,43.159995],[-70.977005,43.159654],[-70.977241,43.159356],[-70.977276,43.159307],[-70.976787,43.158893]]},
+  {id:'p16',name:'Lang Field',coords:[[-70.977518,43.160812],[-70.978155,43.160433],[-70.977812,43.160002],[-70.977570,43.160091],[-70.977275,43.160292],[-70.976663,43.160539],[-70.977038,43.160689],[-70.976739,43.160911],[-70.976871,43.161052],[-70.977122,43.161176],[-70.977518,43.160812]]},
+  {id:'p17',name:'Pond Field',coords:[[-70.970774,43.160374],[-70.970763,43.160515],[-70.971300,43.160859],[-70.971509,43.160914],[-70.971600,43.160914],[-70.971879,43.160738],[-70.972088,43.160726],[-70.972319,43.160675],[-70.972534,43.160695],[-70.972705,43.160785],[-70.973059,43.160722],[-70.973247,43.160636],[-70.973344,43.160499],[-70.973445,43.160300],[-70.973415,43.159818],[-70.973354,43.159655],[-70.973016,43.159451],[-70.972946,43.159330],[-70.972772,43.159292],[-70.972540,43.159627],[-70.972664,43.159648],[-70.972930,43.159823],[-70.972892,43.159926],[-70.972705,43.160092],[-70.972512,43.160202],[-70.972250,43.160252],[-70.971642,43.160300],[-70.971406,43.160213],[-70.970774,43.160374]]},
+  {id:'p18',name:'Polo Field',coords:[[-70.972919,43.159071],[-70.972220,43.158593],[-70.972040,43.158887],[-70.972142,43.158948],[-70.971473,43.159994],[-70.972177,43.160091],[-70.972919,43.159071]]},
+  {id:'p19',name:'Sheltering Rock',coords:[[-70.974200,43.160550],[-70.973800,43.160350],[-70.973550,43.160550],[-70.973700,43.160800],[-70.974050,43.160750],[-70.974200,43.160550]]},
+  {id:'p20',name:'Hawk Silvopasture',coords:[[-70.972762,43.163448],[-70.973492,43.164313],[-70.974178,43.164387],[-70.975015,43.164059],[-70.975678,43.163301],[-70.975232,43.162486],[-70.976924,43.161226],[-70.976156,43.160708],[-70.976388,43.160099],[-70.975658,43.159441],[-70.974779,43.158925],[-70.972890,43.158925],[-70.973298,43.159629],[-70.974062,43.160275],[-70.974627,43.160746],[-70.974465,43.161099],[-70.974345,43.161624],[-70.974707,43.162093],[-70.974909,43.162423],[-70.973856,43.162994],[-70.972762,43.163448]]}
+];
+
+var LIVESTOCK = {
+  sheep:{name:'Sheep',enabled:true,breeds:['Katahdin','Dorper','Suffolk','Hampshire','Merino','Romney','Mixed'],groupTypes:[{v:'sheep_ewe',l:'Ewes'},{v:'sheep_ram',l:'Rams'},{v:'sheep_lamb',l:'Lambs'},{v:'sheep_wether',l:'Wethers'}],conditions:['Barber Pole Worm','Coccidia','Foot Rot','Bottle Jaw','Orf','Pregnancy Toxemia','Pneumonia','Pink Eye','Scours']},
+  cattle:{name:'Cattle',enabled:true,breeds:['Angus','Hereford','Charolais','Simmental','Devon','Dexter','Highland','Mixed'],groupTypes:[{v:'cattle_cow',l:'Cows'},{v:'cattle_bull',l:'Bulls'},{v:'cattle_calf',l:'Calves'},{v:'cattle_steer',l:'Steers'}],conditions:['BRD','Pneumonia','Pink Eye','Anaplasmosis','Hardware Disease','Bloat','Blackleg']},
+  goat:{name:'Goats',enabled:false,breeds:['Boer','Kiko','Spanish','Nubian','Alpine','Mixed'],groupTypes:[{v:'goat_doe',l:'Does'},{v:'goat_buck',l:'Bucks'},{v:'goat_kid',l:'Kids'}],conditions:['Barber Pole','CAE','CL','Foot Rot','Urinary Calculi']},
+  poultry:{name:'Poultry',enabled:false,breeds:['Layers','Broilers','Turkeys','Ducks','Geese'],groupTypes:[{v:'poultry_layers',l:'Layers'},{v:'poultry_broilers',l:'Broilers'},{v:'poultry_turkeys',l:'Turkeys'}],conditions:['Respiratory','Coccidiosis','Marek','Bumblefoot']},
+  swine:{name:'Swine',enabled:false,breeds:['Berkshire','Duroc','Hampshire','Yorkshire','Tamworth'],groupTypes:[{v:'swine_sow',l:'Sows'},{v:'swine_boar',l:'Boars'},{v:'swine_piglet',l:'Piglets'}],conditions:['PRRS','Pneumonia','MMA','Erysipelas','Mange']}
+};
+
+// STATE
+var STORAGE_KEY = 'tuckaway-grazing-v4';
+var state = {
+  paddocks:[],herds:[],groups:[],animals:[],grazingEvents:[],observations:[],healthRecords:[],
+  hayInventory:[],feedingRecords:[],
+  fenceLines:[],fenceEquipment:[],fenceTasks:[],gates:[],
+  waterSources:[],waterEquipment:[],waterTasks:[],
+  storageLocations:[],hayFields:[],
+  settings:{
+    modules:{sheep:true,cattle:true,goat:false,poultry:false,swine:false},
+    hayWeights:{round_4x5:850,round_5x5:1100,square_small:45,square_3x4:1200},
+    cutsPerYear:2,defaultWaste:15
+  }
+};
+
+var map=null,paddockLayers={},herdMarkers={},fenceLayer=null,waterLayer=null,editableLayers=null,drawControl=null;
+var selectedHerd=null,targetPaddock=null,selectedDensity='medium';
+var isPlaying=false,playInterval=null,isRecording=false,recognition=null,pendingVoice=null;
+var pendingPaddock=null,drawMode=null;
+
+// INIT
+document.addEventListener('DOMContentLoaded',function(){
+  try{
+    loadState();
+    initUI();
+    renderAll();
+    try{initMap();}catch(e){console.error('Map error:',e);}
+  }catch(e){console.error('Init error:',e);}
+});
+
+function loadState(){
+  try{
+    var saved=localStorage.getItem(STORAGE_KEY);
+    if(saved) state=Object.assign({},state,JSON.parse(saved));
+    if(!state.paddocks||!state.paddocks.length) initPaddocks();
+    if(!state.herds||!state.herds.length) initDemo();
+    if(!state.storageLocations) state.storageLocations=[{id:'loc1',name:'Barn'},{id:'loc2',name:'Field Storage'}];
+    if(!state.hayFields) state.hayFields=[{id:'fld1',name:'South Hayfield',acres:12}];
+    if(!state.waterSources) initWaterSources();
+  }catch(e){initPaddocks();initDemo();}
+}
+
+function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}}
+
+function initPaddocks(){
+  var colors=['#65a30d','#84cc16','#22c55e','#14b8a6','#06b6d4','#3b82f6','#8b5cf6','#d946ef','#f43f5e','#f97316'];
+  state.paddocks=KML_PADDOCKS.map(function(k,i){
+    return{id:k.id,name:k.name,coords:k.coords,acres:calcArea(k.coords),type:k.name.includes('Silvopasture')?'silvopasture':'graze',forageHeight:6+Math.random()*8,forageDensity:['low','medium','high'][Math.floor(Math.random()*3)],color:colors[i%colors.length],lastGrazed:null,notes:''};
+  });
+}
+
+function initWaterSources(){
+  state.waterSources=[
+    {id:'w1',name:'Gibby Pond',type:'pond',lat:43.1545,lng:-70.9758,paddocks:'Gibby Fields',status:'active'},
+    {id:'w2',name:'Stream Crossing',type:'stream',lat:43.1598,lng:-70.9725,paddocks:'Dogleg Fields',status:'seasonal'},
+    {id:'w3',name:'Hawk Tank',type:'tank',lat:43.162,lng:-70.9735,capacity:500,paddocks:'Hawk Field',status:'active'},
+    {id:'w4',name:'James Tank',type:'tank',lat:43.1638,lng:-70.9702,capacity:300,paddocks:'James Field',status:'active'}
+  ];
+}
+
+function initDemo(){
+  state.groups=[
+    {id:'g1',name:'Ewes',type:'sheep_ewe',count:65,weight:130,herdId:'h1'},
+    {id:'g2',name:'Lambs',type:'sheep_lamb',count:92,weight:75,herdId:'h1'},
+    {id:'g3',name:'Cows',type:'cattle_cow',count:4,weight:1000,herdId:'h2'},
+    {id:'g4',name:'Calves',type:'cattle_calf',count:4,weight:500,herdId:'h2'}
+  ];
+  state.herds=[
+    {id:'h1',name:'Sheep Flock',color:'#d4a030',paddockId:'p10',groups:['g1','g2']},
+    {id:'h2',name:'Beef Herd',color:'#78350f',paddockId:'p12',groups:['g3','g4']}
+  ];
+  var now=new Date();
+  var twoAgo=new Date(now.getTime()-2*864e5);
+  var oneAgo=new Date(now.getTime()-864e5);
+  state.grazingEvents=[
+    {id:'ge1',herdId:'h1',paddockId:'p10',date:twoAgo.toISOString(),days:4,endDate:null},
+    {id:'ge2',herdId:'h2',paddockId:'p12',date:oneAgo.toISOString(),days:5,endDate:null}
+  ];
+  state.animals=[
+    {id:'a1',tag:'2022-001',name:'Rosie',species:'sheep',breed:'Katahdin',sex:'female',weight:145,birthdate:'2022-03-15',status:'active',herdId:'h1',health:'good'},
+    {id:'a2',tag:'B-001',name:'Maple',species:'cattle',breed:'Angus',sex:'female',weight:1100,birthdate:'2020-04-10',status:'active',herdId:'h2',health:'good'}
+  ];
+  state.hayInventory=[
+    {id:'hay1',type:'round_4x5',cut:'first',qty:45,weight:850,quality:'good',location:'loc1',field:'fld1',notes:''},
+    {id:'hay2',type:'round_4x5',cut:'second',qty:30,weight:900,quality:'excellent',location:'loc2',field:'fld1',notes:'Higher protein'}
+  ];
+  state.feedingRecords=[];
+  state.fenceEquipment=[
+    {id:'fe1',type:'charger',qty:2,location:'Barn',condition:'good',notes:'Gallagher M300'},
+    {id:'fe2',type:'polywire',qty:4,location:'Barn',condition:'good',notes:'656ft reels'},
+    {id:'fe3',type:'posts',qty:100,location:'Barn',condition:'good',notes:'Step-in posts'},
+    {id:'fe4',type:'netting',qty:3,location:'Field',condition:'fair',notes:'164ft rolls'}
+  ];
+  state.fenceLines=[
+    {id:'fl1',name:'Perimeter North',type:'permanent',length:'2400ft',condition:'good',lastCheck:oneAgo.toISOString()},
+    {id:'fl2',name:'Hawk Portable',type:'portable',length:'656ft',condition:'good',lastCheck:now.toISOString()}
+  ];
+  state.gates=[
+    {id:'gt1',name:'Main Gate',location:'Entrance',type:'metal',condition:'good',notes:''},
+    {id:'gt2',name:'Hawk Gate',location:'Hawk Field',type:'electric',condition:'good',notes:'Spring handle'}
+  ];
+  saveState();
+}
+
+function calcArea(coords){
+  if(!coords||coords.length<3)return 0;
+  var area=0;
+  for(var i=0;i<coords.length-1;i++){area+=coords[i][0]*coords[i+1][1]-coords[i+1][0]*coords[i][1];}
+  return(Math.abs(area)/2*111319*111319*Math.cos(43.16*Math.PI/180)/4046.86).toFixed(1);
+}
+
+function initUI(){
+  document.querySelectorAll('.nav-btn').forEach(function(el){el.addEventListener('click',function(){showPage(this.dataset.page);});});
+  document.getElementById('time-slider').addEventListener('input',onSliderChange);
+  document.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){
+    var tabId=this.dataset.tab||this.dataset.species;
+    this.closest('.tabs').querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
+    this.classList.add('active');
+    if(this.dataset.tab){var page=this.closest('.page');if(page){page.querySelectorAll('.tab-content').forEach(function(c){c.classList.remove('active');});var target=document.getElementById('tab-'+tabId);if(target)target.classList.add('active');}}
+    if(this.dataset.species)renderAnimals(tabId);
+  });});
+  document.querySelectorAll('.filter-btn[data-filter]').forEach(function(btn){btn.addEventListener('click',function(){
+    document.querySelectorAll('.filter-btn[data-filter]').forEach(function(b){b.classList.remove('active');});
+    this.classList.add('active');
+    filterPaddocks(this.dataset.filter);
+  });});
+  if('webkitSpeechRecognition' in window||'SpeechRecognition' in window){
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    recognition=new SR();recognition.continuous=false;recognition.interimResults=true;
+    recognition.onresult=onVoiceResult;
+    recognition.onend=function(){if(isRecording)recognition.start();};
+  }
+  renderModules();
+  loadSettings();
+}
+
+function showPage(page){
+  document.querySelectorAll('.nav-btn').forEach(function(el){el.classList.toggle('active',el.dataset.page===page);});
+  document.querySelectorAll('.page').forEach(function(el){el.classList.toggle('active',el.id==='page-'+page);});
+  if(page==='map'&&map)setTimeout(function(){map.invalidateSize();},100);
+  if(page==='hay')calcHay();
+  renderAll();
+}
+
+// =============================================
+// MAP
+// =============================================
+function initMap(){
+  if(typeof L==='undefined'){console.warn('Leaflet not loaded');return;}
+  map=L.map('map').setView([43.160,-70.972],14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'OSM'}).addTo(map);
+  
+  fenceLayer=L.layerGroup().addTo(map);
+  waterLayer=L.layerGroup().addTo(map);
+  editableLayers=new L.FeatureGroup().addTo(map);
+  
+  renderPaddocks();
+  renderFenceLines();
+  renderWaterPoints();
+  renderHerds();
+  
+  map.on('draw:created',onDrawCreated);
+  map.on('draw:edited',onDrawEdited);
+}
+
+function renderPaddocks(){
+  editableLayers.clearLayers();
+  paddockLayers={};
+  state.paddocks.forEach(function(p){
+    if(!p.coords||!p.coords.length)return;
+    var status=getStatus(p);
+    var latlngs=p.coords.map(function(c){return[c[1],c[0]];});
+    var poly=L.polygon(latlngs,{color:p.color,weight:2,fillColor:p.color,fillOpacity:0.3,paddockId:p.id});
+    poly.on('click',function(){onPaddockClick(p);});
+    poly.bindPopup(makePopup(p,status));
+    editableLayers.addLayer(poly);
+    paddockLayers[p.id]=poly;
+  });
+}
+
+function makePopup(p,status){
+  var herd=state.herds.find(function(h){return h.paddockId===p.id;});
+  var dm=estimateDM(p);
+  return '<h4>'+p.name+'</h4><p><b>Acres:</b> '+p.acres+'</p><p><b>Status:</b> '+status+'</p><p><b>Forage:</b> '+dm.toFixed(0)+' lbs/ac</p>'+(herd?'<p><b>Herd:</b> '+herd.name+'</p>':'')+'<button class="popup-btn" onclick="editPaddockGeometry(\''+p.id+'\')">Edit</button>';
+}
+
+function renderFenceLines(){
+  fenceLayer.clearLayers();
+  state.fenceLines.forEach(function(f){
+    if(!f.coords||!f.coords.length)return;
+    var latlngs=f.coords.map(function(c){return[c[1],c[0]];});
+    var color=f.type==='permanent'?'#78350f':'#f97316';
+    var dashArray=f.type==='portable'?'8,6':null;
+    var line=L.polyline(latlngs,{color:color,weight:3,dashArray:dashArray});
+    line.bindPopup('<b>'+f.name+'</b><br>'+f.type+' · '+f.length);
+    fenceLayer.addLayer(line);
+  });
+}
+
+function renderWaterPoints(){
+  waterLayer.clearLayers();
+  state.waterSources.forEach(function(w){
+    if(!w.lat||!w.lng)return;
+    var marker=L.circleMarker([w.lat,w.lng],{radius:8,fillColor:'#0ea5e9',color:'#fff',weight:2,fillOpacity:0.9});
+    marker.bindPopup('<b>'+w.name+'</b><br>'+w.type+(w.capacity?' · '+w.capacity+' gal':'')+'<br>Status: '+w.status);
+    waterLayer.addLayer(marker);
+  });
+}
+
+function toggleFenceLayer(){
+  var show=document.getElementById('show-fences').checked;
+  if(show)map.addLayer(fenceLayer);else map.removeLayer(fenceLayer);
+}
+function toggleWaterLayer(){
+  var show=document.getElementById('show-water').checked;
+  if(show)map.addLayer(waterLayer);else map.removeLayer(waterLayer);
+}
+
+function renderHerds(viewDate){
+  Object.values(herdMarkers).forEach(function(m){map.removeLayer(m);});
+  herdMarkers={};
+  
+  state.herds.forEach(function(herd){
+    var paddockId=herd.paddockId;
+    
+    // If viewDate provided, find where herd was at that date
+    if(viewDate){
+      var events=state.grazingEvents.filter(function(e){return e.herdId===herd.id;}).sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+      for(var i=0;i<events.length;i++){
+        var evtDate=new Date(events[i].date);
+        if(evtDate<=viewDate){
+          paddockId=events[i].paddockId;
+          break;
+        }
+      }
+    }
+    
+    var paddock=state.paddocks.find(function(p){return p.id===paddockId;});
+    if(!paddock||!paddock.coords||!paddock.coords.length)return;
+    
+    var center=getCenter(paddock.coords);
+    var groups=state.groups.filter(function(g){return herd.groups&&herd.groups.includes(g.id);});
+    var total=groups.reduce(function(s,g){return s+g.count;},0);
+    var selected=selectedHerd===herd.id;
+    
+    var icon=L.divIcon({
+      className:'herd-marker',
+      html:'<div style="background:'+herd.color+';color:#fff;padding:5px 10px;border-radius:14px;font-size:11px;font-weight:700;white-space:nowrap;border:'+(selected?'3px solid #fff':'2px solid rgba(255,255,255,0.8)')+';box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:pointer;transform:scale('+(selected?'1.1':'1')+')">'+total+' '+herd.name.split(' ')[0]+'</div>',
+      iconSize:[90,26],iconAnchor:[45,13]
+    });
+    var marker=L.marker([center.lat,center.lng],{icon:icon}).addTo(map);
+    marker.on('click',function(){selectHerd(herd.id);});
+    herdMarkers[herd.id]=marker;
+  });
+}
+
+function getCenter(coords){var lat=0,lng=0;coords.forEach(function(c){lng+=c[0];lat+=c[1];});return{lat:lat/coords.length,lng:lng/coords.length};}
+
+function getStatus(p){
+  var active=state.grazingEvents.find(function(e){return e.paddockId===p.id&&!e.endDate;});
+  if(active)return'grazing';
+  var dm=estimateDM(p);
+  if(dm>1500)return'ready';
+  if(dm>800)return'recovering';
+  return'resting';
+}
+
+function estimateDM(p){
+  var mult={high:250,medium:200,low:150};
+  return Math.max(0,(p.forageHeight||8)-4)*(mult[p.forageDensity]||200);
+}
+
+function filterPaddocks(filter){
+  Object.entries(paddockLayers).forEach(function(entry){
+    var id=entry[0],layer=entry[1];
+    var p=state.paddocks.find(function(x){return x.id===id;});
+    var status=getStatus(p);
+    var match=filter==='all'||status===filter;
+    layer.setStyle({opacity:match?1:0.15,fillOpacity:match?0.3:0.05});
+  });
+}
+
+// TIMELINE - Shows herds at their recorded positions for each date
+function onSliderChange(){
+  var slider=document.getElementById('time-slider');
+  var totalDays=parseInt(slider.max);
+  var daysFromStart=parseInt(slider.value);
+  var startDate=new Date();
+  startDate.setFullYear(startDate.getFullYear()-1);
+  startDate.setMonth(0,1);
+  var viewDate=new Date(startDate.getTime()+daysFromStart*864e5);
+  var isCurrent=daysFromStart>=totalDays-1;
+  document.getElementById('time-display').textContent=isCurrent?'Current':viewDate.toLocaleDateString();
+  renderHerds(isCurrent?null:viewDate);
+}
+
+function togglePlay(){
+  isPlaying=!isPlaying;
+  var icon=document.getElementById('play-icon');
+  if(isPlaying){
+    icon.innerHTML='<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+    var slider=document.getElementById('time-slider');
+    playInterval=setInterval(function(){
+      var val=parseInt(slider.value);
+      if(val>=parseInt(slider.max))val=0;else val+=1;
+      slider.value=val;
+      onSliderChange();
+    },100);
+  }else{
+    icon.innerHTML='<polygon points="5,3 19,12 5,21"/>';
+    clearInterval(playInterval);
+  }
+}
+
+// TAP-TO-MOVE
+function selectHerd(herdId){
+  if(selectedHerd===herdId){cancelSelection();return;}
+  selectedHerd=herdId;
+  var herd=state.herds.find(function(h){return h.id===herdId;});
+  document.getElementById('selection-herd-name').textContent=herd?herd.name:'Herd';
+  document.getElementById('selection-bar').classList.add('active');
+  renderHerds();
+  toast('Tap paddock to move '+(herd?herd.name:''));
+}
+
+function cancelSelection(){
+  selectedHerd=null;targetPaddock=null;
+  document.getElementById('selection-bar').classList.remove('active');
+  renderHerds();
+}
+
+function onPaddockClick(paddock){
+  if(selectedHerd){
+    targetPaddock=paddock.id;
+    var herd=state.herds.find(function(h){return h.id===selectedHerd;});
+    document.getElementById('confirm-move-text').textContent='Move '+(herd?herd.name:'herd')+' to '+paddock.name+'?';
+    document.getElementById('confirm-move-date').value=new Date().toISOString().split('T')[0];
+    openModal('confirm-move');
+  }
+}
+
+function confirmMapMove(){
+  if(!selectedHerd||!targetPaddock)return;
+  var days=parseInt(document.getElementById('confirm-move-days').value)||3;
+  var date=document.getElementById('confirm-move-date').value;
+  moveHerd(selectedHerd,targetPaddock,days,date);
+  closeModal('confirm-move');
+  cancelSelection();
+}
+
+function moveHerd(herdId,paddockId,days,dateStr){
+  var herd=state.herds.find(function(h){return h.id===herdId;});
+  if(!herd)return;
+  var moveDate=dateStr?new Date(dateStr):new Date();
+  
+  // End any current grazing event for this herd
+  state.grazingEvents.forEach(function(e){
+    if(e.herdId===herdId&&!e.endDate){
+      e.endDate=moveDate.toISOString();
+    }
+  });
+  
+  // Update paddock lastGrazed
+  var oldP=state.paddocks.find(function(p){return p.id===herd.paddockId;});
+  if(oldP)oldP.lastGrazed=moveDate.toISOString();
+  
+  // Create new grazing event with specific date
+  state.grazingEvents.push({
+    id:'ge'+Date.now(),
+    herdId:herdId,
+    paddockId:paddockId,
+    date:moveDate.toISOString(),
+    days:days,
+    endDate:null
+  });
+  
+  herd.paddockId=paddockId;
+  saveState();
+  renderAll();
+  renderPaddocks();
+  renderHerds();
+  
+  var newP=state.paddocks.find(function(p){return p.id===paddockId;});
+  toast(herd.name+' moved to '+(newP?newP.name:'paddock')+' on '+moveDate.toLocaleDateString());
+}
+
+// DRAW MODE
+function startAddPaddock(){
+  pendingPaddock=null;
+  document.getElementById('paddock-modal-title').textContent='Add Paddock';
+  document.getElementById('paddock-edit-id').value='';
+  document.getElementById('paddock-name').value='';
+  document.getElementById('paddock-acres').value='';
+  document.getElementById('paddock-type').value='graze';
+  document.getElementById('paddock-color').value='#65a30d';
+  document.getElementById('paddock-notes').value='';
+  document.getElementById('paddock-delete-btn').style.display='none';
+  openModal('add-paddock');
+}
+
+function savePaddockAndDraw(){
+  var name=document.getElementById('paddock-name').value.trim();
+  if(!name){toast('Name required');return;}
+  var editId=document.getElementById('paddock-edit-id').value;
+  
+  pendingPaddock={
+    id:editId||'p'+Date.now(),
+    name:name,
+    acres:parseFloat(document.getElementById('paddock-acres').value)||0,
+    type:document.getElementById('paddock-type').value,
+    color:document.getElementById('paddock-color').value,
+    notes:document.getElementById('paddock-notes').value,
+    coords:[],
+    forageHeight:8,
+    forageDensity:'medium',
+    lastGrazed:null
+  };
+  
+  closeModal('add-paddock');
+  showPage('map');
+  
+  setTimeout(function(){
+    enableDrawMode('polygon');
+    toast('Draw paddock boundary on map');
+  },300);
+}
+
+function enableDrawMode(type){
+  if(drawControl){map.removeControl(drawControl);drawControl=null;}
+  
+  var drawOptions={position:'topright',edit:{featureGroup:editableLayers,remove:false},draw:{polyline:false,rectangle:false,circle:false,marker:false,circlemarker:false,polygon:false}};
+  
+  if(type==='polygon'){
+    drawOptions.draw.polygon={allowIntersection:false,shapeOptions:{color:pendingPaddock?pendingPaddock.color:'#65a30d',fillOpacity:0.3}};
+  }else if(type==='polyline'){
+    drawOptions.draw.polyline={shapeOptions:{color:'#f97316',weight:3}};
+  }else if(type==='marker'){
+    drawOptions.draw.marker=true;
+  }
+  
+  drawControl=new L.Control.Draw(drawOptions);
+  map.addControl(drawControl);
+  drawMode=type;
+}
+
+function onDrawCreated(e){
+  var layer=e.layer;
+  
+  if(drawMode==='polygon'&&pendingPaddock){
+    var coords=layer.getLatLngs()[0].map(function(ll){return[ll.lng,ll.lat];});
+    pendingPaddock.coords=coords;
+    pendingPaddock.acres=calcArea(coords);
+    
+    var existing=state.paddocks.findIndex(function(p){return p.id===pendingPaddock.id;});
+    if(existing>=0){
+      state.paddocks[existing]=pendingPaddock;
+    }else{
+      state.paddocks.push(pendingPaddock);
+    }
+    saveState();
+    renderPaddocks();
+    renderAll();
+    toast(pendingPaddock.name+' saved ('+pendingPaddock.acres+' acres)');
+    pendingPaddock=null;
+  }
+  
+  if(drawControl){map.removeControl(drawControl);drawControl=null;}
+  drawMode=null;
+}
+
+function onDrawEdited(e){
+  e.layers.eachLayer(function(layer){
+    var pid=layer.options.paddockId;
+    if(pid){
+      var coords=layer.getLatLngs()[0].map(function(ll){return[ll.lng,ll.lat];});
+      var p=state.paddocks.find(function(x){return x.id===pid;});
+      if(p){
+        p.coords=coords;
+        p.acres=calcArea(coords);
+        saveState();
+        toast(p.name+' geometry updated');
+      }
+    }
+  });
+  renderAll();
+}
+
+function editPaddockGeometry(id){
+  var p=state.paddocks.find(function(x){return x.id===id;});
+  if(!p)return;
+  
+  pendingPaddock=Object.assign({},p);
+  showPage('map');
+  
+  setTimeout(function(){
+    // Remove existing polygon and enable redraw
+    if(paddockLayers[id]){
+      editableLayers.removeLayer(paddockLayers[id]);
+    }
+    enableDrawMode('polygon');
+    toast('Redraw '+p.name+' boundary');
+  },300);
+}
+
+function startAddFence(type){
+  drawMode='fence';
+  toast('Draw '+type+' fence line on map (feature coming soon)');
+}
+
+function startAddGate(){
+  toast('Click map to place gate (feature coming soon)');
+}
+
+function startAddWater(){
+  openModal('add-water-point');
+}
+
+// =============================================
+// VOICE
+// =============================================
+function toggleVoice(){document.getElementById('voice-panel').classList.toggle('active');}
+function closeVoice(){document.getElementById('voice-panel').classList.remove('active');stopRecording();}
+function toggleRecording(){if(!recognition){toast('Voice not supported');return;}if(isRecording)stopRecording();else startRecording();}
+function startRecording(){
+  isRecording=true;
+  document.getElementById('voice-btn').classList.add('recording');
+  document.getElementById('voice-record-btn').textContent='Stop';
+  document.getElementById('voice-transcript').textContent='Listening...';
+  document.getElementById('voice-transcript').classList.add('listening');
+  recognition.start();
+}
+function stopRecording(){
+  isRecording=false;
+  document.getElementById('voice-btn').classList.remove('recording');
+  document.getElementById('voice-record-btn').textContent='Start Recording';
+  document.getElementById('voice-transcript').classList.remove('listening');
+  if(recognition)recognition.stop();
+}
+function onVoiceResult(event){
+  var transcript='';
+  for(var i=event.resultIndex;i<event.results.length;i++)transcript+=event.results[i][0].transcript;
+  document.getElementById('voice-transcript').textContent=transcript||'Listening...';
+  if(event.results[event.resultIndex].isFinal)parseVoice(transcript.toLowerCase().trim());
+}
+function parseVoice(text){
+  stopRecording();pendingVoice=null;
+  var moveMatch=text.match(/move\s+(sheep|beef|cattle|herd|flock)\s+(?:to\s+)?(.+)/i);
+  if(moveMatch){
+    var herdQ=moveMatch[1].toLowerCase();
+    var paddockQ=moveMatch[2].toLowerCase();
+    var herd=state.herds.find(function(h){return h.name.toLowerCase().includes(herdQ==='beef'||herdQ==='cattle'?'beef':'sheep');});
+    var paddock=state.paddocks.find(function(p){return p.name.toLowerCase().includes(paddockQ.replace(/field|pasture/g,'').trim());});
+    if(herd&&paddock){
+      pendingVoice={type:'move',herd:herd,paddock:paddock};
+      document.getElementById('voice-transcript').innerHTML='<b>Move '+herd.name+' to '+paddock.name+'?</b>';
+      document.getElementById('voice-confirm-btn').style.display='inline-flex';
+      return;
+    }
+  }
+  var feedMatch=text.match(/feed\s+(\d+)\s+bale[s]?\s+(?:to\s+)?(.+)/i);
+  if(feedMatch){
+    var bales=parseInt(feedMatch[1]);
+    var herdQ=feedMatch[2].toLowerCase();
+    var herd=state.herds.find(function(h){return h.name.toLowerCase().includes(herdQ);});
+    if(herd&&bales>0){
+      pendingVoice={type:'feed',herd:herd,bales:bales};
+      document.getElementById('voice-transcript').innerHTML='<b>Feed '+bales+' bales to '+herd.name+'?</b>';
+      document.getElementById('voice-confirm-btn').style.display='inline-flex';
+      return;
+    }
+  }
+  var readMatch=text.match(/reading\s+(\d+)\s*(?:inches?)?\s*(high|medium|low)?/i);
+  if(readMatch){
+    var height=parseInt(readMatch[1]);
+    var density=readMatch[2]?readMatch[2].toLowerCase():'medium';
+    pendingVoice={type:'reading',height:height,density:density};
+    document.getElementById('voice-transcript').innerHTML='<b>Forage: '+height+'" '+density+'</b>';
+    document.getElementById('voice-confirm-btn').style.display='inline-flex';
+    return;
+  }
+  if(text.includes('confirm')||text.includes('yes')){confirmVoice();return;}
+  document.getElementById('voice-transcript').innerHTML='<i>Not recognized</i>';
+}
+function confirmVoice(){
+  if(!pendingVoice)return;
+  var cmd=pendingVoice;
+  if(cmd.type==='move'){
+    moveHerd(cmd.herd.id,cmd.paddock.id,3);
+  }else if(cmd.type==='feed'){
+    var hay=state.hayInventory.find(function(h){return h.qty>=cmd.bales;});
+    if(hay){
+      hay.qty-=cmd.bales;
+      state.feedingRecords.unshift({id:'fr'+Date.now(),herdId:cmd.herd.id,hayId:hay.id,bales:cmd.bales,lbs:cmd.bales*hay.weight,date:new Date().toISOString(),notes:'Voice'});
+      saveState();renderAll();
+      toast('Fed '+cmd.bales+' bales to '+cmd.herd.name);
+    }else{toast('Not enough hay');}
+  }else if(cmd.type==='reading'){
+    var evt=state.grazingEvents.find(function(e){return!e.endDate;});
+    var pid=evt?evt.paddockId:state.paddocks[0].id;
+    var p=state.paddocks.find(function(x){return x.id===pid;});
+    if(p){p.forageHeight=cmd.height;p.forageDensity=cmd.density;saveState();toast('Reading saved');}
+  }
+  pendingVoice=null;
+  document.getElementById('voice-confirm-btn').style.display='none';
+  closeVoice();
+  renderAll();
+}
+
+// =============================================
+// RENDERING
+// =============================================
+function renderAll(){
+  renderDashboard();
+  renderPaddocksTable();
+  renderHerdsList();
+  renderAnimals();
+  renderHayTable();
+  renderFeedingTable();
+  renderHealthTable();
+  renderObsTable();
+  renderFenceEquipment();
+  renderFenceLines();
+  renderGates();
+  renderFenceTasks();
+  renderWaterSources();
+  renderWaterTasks();
+  renderStorageLocations();
+  renderFieldLocations();
+  populateSelects();
+}
+
+function renderDashboard(){
+  var totalAcres=state.paddocks.reduce(function(s,p){return s+parseFloat(p.acres||0);},0);
+  var totalAnimals=state.groups.reduce(function(s,g){return s+g.count;},0)+state.animals.length;
+  var totalAU=state.groups.reduce(function(s,g){return s+(g.count*g.weight/1000);},0)+state.animals.reduce(function(s,a){return s+(a.weight/1000);},0);
+  var totalHay=state.hayInventory.reduce(function(s,h){return s+(h.qty*h.weight/2000);},0);
+  var activeFence=state.fenceEquipment.filter(function(f){return f.condition==='good';}).length;
+  var activeWater=state.waterSources.filter(function(w){return w.status==='active';}).length;
+  
+  document.getElementById('dashboard-stats').innerHTML=
+    '<div class="stat"><div class="stat-num">'+totalAcres.toFixed(0)+'</div><div class="stat-lbl">Acres</div></div>'+
+    '<div class="stat amber"><div class="stat-num">'+state.paddocks.length+'</div><div class="stat-lbl">Paddocks</div></div>'+
+    '<div class="stat earth"><div class="stat-num">'+totalAnimals+'</div><div class="stat-lbl">Animals</div></div>'+
+    '<div class="stat"><div class="stat-num">'+totalAU.toFixed(1)+'</div><div class="stat-lbl">AU</div></div>'+
+    '<div class="stat hay"><div class="stat-num">'+totalHay.toFixed(1)+'</div><div class="stat-lbl">Tons Hay</div></div>'+
+    '<div class="stat fence"><div class="stat-num">'+activeFence+'</div><div class="stat-lbl">Fence Equip</div></div>'+
+    '<div class="stat water"><div class="stat-num">'+activeWater+'</div><div class="stat-lbl">Water Pts</div></div>';
+  
+  var active=state.grazingEvents.filter(function(e){return!e.endDate;});
+  document.getElementById('active-grazing').innerHTML=active.length===0?'<p style="color:var(--muted);font-size:11px">No active grazing</p>':active.map(function(e){
+    var herd=state.herds.find(function(h){return h.id===e.herdId;});
+    var paddock=state.paddocks.find(function(p){return p.id===e.paddockId;});
+    var days=Math.floor((Date.now()-new Date(e.date))/864e5);
+    return'<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--divider)"><div><strong>'+(herd?herd.name:'—')+'</strong><br><span style="font-size:11px;color:var(--muted)">'+(paddock?paddock.name:'—')+'</span></div><div style="text-align:right;color:var(--grass-light);font-weight:600;font-size:12px">Day '+(days+1)+'/'+e.days+'</div></div>';
+  }).join('');
+  
+  var recent=state.feedingRecords.slice(0,3).concat(state.grazingEvents.slice(-2).reverse()).slice(0,4);
+  document.getElementById('recent-activity').innerHTML=recent.length===0?'<p style="color:var(--muted);font-size:11px">No recent activity</p>':state.feedingRecords.slice(0,3).map(function(r){
+    var herd=state.herds.find(function(h){return h.id===r.herdId;});
+    return'<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--divider);font-size:11px"><div>Fed '+r.bales+' bales → '+(herd?herd.name:'—')+'</div><div style="color:var(--muted)">'+new Date(r.date).toLocaleDateString()+'</div></div>';
+  }).join('');
+  
+  var sorted=state.paddocks.slice().sort(function(a,b){return estimateDM(b)-estimateDM(a);}).slice(0,5);
+  document.getElementById('forage-bars').innerHTML=sorted.map(function(p){
+    var dm=estimateDM(p);var pct=Math.min(100,(dm/2500)*100);
+    return'<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px"><span>'+p.name+'</span><span style="color:var(--muted)">'+dm.toFixed(0)+'</span></div><div style="height:5px;background:var(--forest);border-radius:3px"><div style="width:'+pct+'%;height:100%;background:'+p.color+';border-radius:3px"></div></div></div>';
+  }).join('');
+}
+
+function renderPaddocksTable(){
+  var tbody=document.getElementById('paddocks-tbody');if(!tbody)return;
+  tbody.innerHTML=state.paddocks.map(function(p){
+    var status=getStatus(p);
+    var thumb=p.coords&&p.coords.length?makeThumbnail(p.coords,p.color):'<span style="color:var(--muted);font-size:9px">No geo</span>';
+    return'<tr class="clickable"><td onclick="editPaddockGeometry(\''+p.id+'\')" style="cursor:pointer" title="Edit on map">'+thumb+'</td><td><div style="width:8px;height:22px;background:'+p.color+';border-radius:2px"></div></td><td onclick="openEditPaddock(\''+p.id+'\')"><strong>'+p.name+'</strong></td><td>'+p.acres+'</td><td style="text-transform:capitalize">'+(p.type||'graze')+'</td><td>'+estimateDM(p).toFixed(0)+'</td><td><span class="badge badge-'+status+'">'+status+'</span></td><td>'+(p.lastGrazed?new Date(p.lastGrazed).toLocaleDateString():'—')+'</td></tr>';
+  }).join('');
+}
+
+function makeThumbnail(coords,color){
+  if(!coords||coords.length<3)return'';
+  var minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  coords.forEach(function(c){minX=Math.min(minX,c[0]);maxX=Math.max(maxX,c[0]);minY=Math.min(minY,c[1]);maxY=Math.max(maxY,c[1]);});
+  var w=maxX-minX,h=maxY-minY;
+  var scale=Math.min(32/w,20/h);
+  var points=coords.map(function(c){return((c[0]-minX)*scale).toFixed(1)+','+((maxY-c[1])*scale).toFixed(1);}).join(' ');
+  return'<svg viewBox="0 0 36 24" style="width:36px;height:24px"><polygon points="'+points+'" fill="'+color+'" fill-opacity="0.5" stroke="'+color+'" stroke-width="1"/></svg>';
+}
+
+function openEditPaddock(id){
+  var p=state.paddocks.find(function(x){return x.id===id;});
+  if(!p)return;
+  document.getElementById('paddock-modal-title').textContent='Edit Paddock';
+  document.getElementById('paddock-edit-id').value=id;
+  document.getElementById('paddock-name').value=p.name;
+  document.getElementById('paddock-acres').value=p.acres;
+  document.getElementById('paddock-type').value=p.type||'graze';
+  document.getElementById('paddock-color').value=p.color||'#65a30d';
+  document.getElementById('paddock-notes').value=p.notes||'';
+  document.getElementById('paddock-delete-btn').style.display='inline-flex';
+  openModal('add-paddock');
+}
+
+function deletePaddock(){
+  var id=document.getElementById('paddock-edit-id').value;
+  if(!id||!confirm('Delete this paddock?'))return;
+  state.paddocks=state.paddocks.filter(function(p){return p.id!==id;});
+  if(paddockLayers[id]&&editableLayers)editableLayers.removeLayer(paddockLayers[id]);
+  saveState();
+  closeModal('add-paddock');
+  renderPaddocks();
+  renderAll();
+  toast('Paddock deleted');
+}
+
+function renderHerdsList(){
+  var el=document.getElementById('herds-list');if(!el)return;
+  el.innerHTML=state.herds.map(function(h){
+    var groups=state.groups.filter(function(g){return h.groups&&h.groups.includes(g.id);});
+    var total=groups.reduce(function(s,g){return s+g.count;},0);
+    var au=groups.reduce(function(s,g){return s+(g.count*g.weight/1000);},0);
+    var paddock=state.paddocks.find(function(p){return p.id===h.paddockId;});
+    return'<div class="herd-card"><div class="herd-header"><div class="herd-name"><div class="herd-dot" style="background:'+h.color+'"></div>'+h.name+'</div><button class="btn btn-outline btn-sm" onclick="selectHerd(\''+h.id+'\');showPage(\'map\')">Move</button></div><div class="herd-meta">'+total+' animals · '+au.toFixed(1)+' AU</div>'+(paddock?'<div class="herd-location"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/></svg>'+paddock.name+'</div>':'')+'<div class="herd-groups">'+groups.map(function(g){return'<span class="group-tag">'+g.count+' '+g.name+'</span>';}).join('')+'</div></div>';
+  }).join('');
+}
+
+function renderAnimals(filter){
+  var tbody=document.getElementById('animals-tbody');if(!tbody)return;
+  var list=filter&&filter!=='all'?state.animals.filter(function(a){return a.species===filter;}):state.animals;
+  tbody.innerHTML=list.map(function(a){
+    var herd=state.herds.find(function(h){return h.id===a.herdId;});
+    var hc=a.health==='good'?'good':a.health==='attention'?'attention':'treatment';
+    return'<tr class="clickable" onclick="openEditAnimal(\''+a.id+'\')"><td><strong>'+a.tag+'</strong></td><td>'+(a.name||'—')+'</td><td style="text-transform:capitalize">'+a.species+'</td><td>'+a.breed+'</td><td style="text-transform:capitalize">'+a.sex+'</td><td>'+a.weight+'</td><td>'+(herd?herd.name:'—')+'</td><td><span class="badge badge-'+hc+'">'+a.health+'</span></td></tr>';
+  }).join('');
+}
+
+function renderHayTable(){
+  var tbody=document.getElementById('hay-tbody');if(!tbody)return;
+  var totalBales=state.hayInventory.reduce(function(s,h){return s+h.qty;},0);
+  var totalTons=state.hayInventory.reduce(function(s,h){return s+(h.qty*h.weight/2000);},0);
+  document.getElementById('hay-stats').innerHTML=
+    '<div class="stat hay"><div class="stat-num">'+totalBales+'</div><div class="stat-lbl">Bales</div></div>'+
+    '<div class="stat"><div class="stat-num">'+totalTons.toFixed(1)+'</div><div class="stat-lbl">Tons</div></div>';
+  tbody.innerHTML=state.hayInventory.map(function(h){
+    var loc=state.storageLocations.find(function(l){return l.id===h.location;});
+    return'<tr><td style="text-transform:capitalize">'+h.type.replace(/_/g,' ')+'</td><td style="text-transform:capitalize">'+h.cut+'</td><td>'+h.qty+'</td><td>'+h.weight+'</td><td>'+(h.qty*h.weight/2000).toFixed(2)+'</td><td style="text-transform:capitalize">'+(h.quality||'—')+'</td><td>'+(loc?loc.name:(h.location||'—'))+'</td><td><button class="btn btn-outline btn-sm" onclick="deleteHay(\''+h.id+'\')">×</button></td></tr>';
+  }).join('');
+}
+
+function renderFeedingTable(){
+  var tbody=document.getElementById('feeding-tbody');if(!tbody)return;
+  tbody.innerHTML=state.feedingRecords.slice(0,20).map(function(r){
+    var herd=state.herds.find(function(h){return h.id===r.herdId;});
+    var hay=state.hayInventory.find(function(h){return h.id===r.hayId;});
+    return'<tr><td>'+new Date(r.date).toLocaleDateString()+'</td><td>'+(herd?herd.name:'—')+'</td><td>'+r.bales+'</td><td style="text-transform:capitalize">'+(hay?hay.type.replace(/_/g,' '):'—')+'</td><td>'+r.lbs+'</td><td>'+(r.notes||'—')+'</td></tr>';
+  }).join('');
+}
+
+function renderHealthTable(){
+  var tbody=document.getElementById('health-tbody');if(!tbody)return;
+  tbody.innerHTML=state.healthRecords.slice(0,15).map(function(r){
+    var animal=state.animals.find(function(a){return a.id===r.animalId;});
+    return'<tr class="clickable" onclick="openEditHealth(\''+r.id+'\')"><td>'+new Date(r.date).toLocaleDateString()+'</td><td>'+(animal?animal.tag:r.groupName||'—')+'</td><td style="text-transform:capitalize">'+r.type.replace(/_/g,' ')+'</td><td>'+(r.condition||'—')+'</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">'+(r.notes||'—')+'</td><td>'+(r.withdrawal>0?r.withdrawal+'d':'—')+'</td></tr>';
+  }).join('');
+}
+
+function renderObsTable(){
+  var tbody=document.getElementById('obs-tbody');if(!tbody)return;
+  tbody.innerHTML=state.observations.slice(0,15).map(function(o){
+    var paddock=state.paddocks.find(function(p){return p.id===o.paddockId;});
+    return'<tr class="clickable" onclick="openEditObs(\''+o.id+'\')"><td>'+new Date(o.date).toLocaleDateString()+'</td><td>'+(paddock?paddock.name:'—')+'</td><td style="text-transform:capitalize">'+o.type+'</td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis">'+(o.notes||'—')+'</td></tr>';
+  }).join('');
+}
+
+function renderFenceEquipment(){
+  var tbody=document.getElementById('fence-equip-tbody');if(!tbody)return;
+  var chargers=state.fenceEquipment.filter(function(e){return e.type==='charger';}).length;
+  var posts=state.fenceEquipment.filter(function(e){return e.type==='posts';}).reduce(function(s,e){return s+e.qty;},0);
+  document.getElementById('fence-stats').innerHTML=
+    '<div class="stat fence"><div class="stat-num">'+chargers+'</div><div class="stat-lbl">Chargers</div></div>'+
+    '<div class="stat"><div class="stat-num">'+posts+'</div><div class="stat-lbl">Posts</div></div>';
+  tbody.innerHTML=state.fenceEquipment.map(function(e){
+    return'<tr><td style="text-transform:capitalize">'+e.type.replace(/_/g,' ')+'</td><td>'+e.qty+'</td><td>'+(e.location||'—')+'</td><td style="text-transform:capitalize">'+e.condition+'</td><td>'+(e.notes||'—')+'</td><td><button class="btn btn-outline btn-sm" onclick="deleteFenceEquip(\''+e.id+'\')">×</button></td></tr>';
+  }).join('');
+}
+
+function renderFenceLines(){
+  var tbody=document.getElementById('fence-lines-tbody');if(!tbody)return;
+  tbody.innerHTML=state.fenceLines.map(function(f){
+    return'<tr><td>'+f.name+'</td><td style="text-transform:capitalize">'+f.type+'</td><td>'+(f.length||'—')+'</td><td style="text-transform:capitalize">'+f.condition+'</td><td>'+(f.lastCheck?new Date(f.lastCheck).toLocaleDateString():'—')+'</td><td><button class="btn btn-outline btn-sm" onclick="deleteFenceLine(\''+f.id+'\')">×</button></td></tr>';
+  }).join('');
+}
+
+function renderGates(){
+  var tbody=document.getElementById('fence-gates-tbody');if(!tbody)return;
+  tbody.innerHTML=state.gates.map(function(g){
+    return'<tr><td>'+g.name+'</td><td>'+(g.location||'—')+'</td><td style="text-transform:capitalize">'+g.type+'</td><td style="text-transform:capitalize">'+g.condition+'</td><td>'+(g.notes||'—')+'</td><td><button class="btn btn-outline btn-sm" onclick="deleteGate(\''+g.id+'\')">×</button></td></tr>';
+  }).join('');
+}
+
+function renderFenceTasks(){
+  var tbody=document.getElementById('fence-tasks-tbody');if(!tbody)return;
+  tbody.innerHTML=state.fenceTasks.slice(0,15).map(function(t){
+    return'<tr><td>'+new Date(t.date).toLocaleDateString()+'</td><td style="text-transform:capitalize">'+t.type+'</td><td>'+(t.location||'—')+'</td><td style="text-transform:capitalize">'+t.status+'</td><td>'+(t.notes||'—')+'</td></tr>';
+  }).join('');
+}
+
+function renderWaterSources(){
+  var tbody=document.getElementById('water-sources-tbody');if(!tbody)return;
+  var active=state.waterSources.filter(function(w){return w.status==='active';}).length;
+  document.getElementById('water-stats').innerHTML=
+    '<div class="stat water"><div class="stat-num">'+state.waterSources.length+'</div><div class="stat-lbl">Sources</div></div>'+
+    '<div class="stat"><div class="stat-num">'+active+'</div><div class="stat-lbl">Active</div></div>';
+  tbody.innerHTML=state.waterSources.map(function(w){
+    return'<tr><td>'+w.name+'</td><td style="text-transform:capitalize">'+w.type+'</td><td>'+(w.paddocks||'—')+'</td><td>'+(w.capacity?w.capacity+' gal':'—')+'</td><td style="text-transform:capitalize">'+w.status+'</td><td><button class="btn btn-outline btn-sm" onclick="deleteWaterSource(\''+w.id+'\')">×</button></td></tr>';
+  }).join('');
+}
+
+function renderWaterTasks(){
+  var tbody=document.getElementById('water-tasks-tbody');if(!tbody)return;
+  tbody.innerHTML=state.waterTasks.slice(0,15).map(function(t){
+    var loc=state.waterSources.find(function(w){return w.id===t.locationId;});
+    return'<tr><td>'+new Date(t.date).toLocaleDateString()+'</td><td style="text-transform:capitalize">'+t.type+'</td><td>'+(loc?loc.name:t.location||'—')+'</td><td style="text-transform:capitalize">'+t.status+'</td><td>'+(t.notes||'—')+'</td></tr>';
+  }).join('');
+}
+
+function renderStorageLocations(){
+  var el=document.getElementById('storage-locations');if(!el)return;
+  el.innerHTML=state.storageLocations.map(function(l){
+    return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.2);border-radius:4px;margin-bottom:6px"><span>'+l.name+'</span><button class="btn btn-outline btn-sm" onclick="deleteLocation(\''+l.id+'\')">×</button></div>';
+  }).join('');
+}
+
+function renderFieldLocations(){
+  var el=document.getElementById('field-locations');if(!el)return;
+  el.innerHTML=state.hayFields.map(function(f){
+    return'<div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(0,0,0,0.2);border-radius:4px;margin-bottom:6px"><span>'+f.name+(f.acres?' ('+f.acres+' ac)':'')+'</span><button class="btn btn-outline btn-sm" onclick="deleteField(\''+f.id+'\')">×</button></div>';
+  }).join('');
+}
+
+function renderModules(){
+  var el=document.getElementById('modules-list');if(!el)return;
+  el.innerHTML=Object.keys(LIVESTOCK).map(function(key){
+    var mod=LIVESTOCK[key];
+    var active=state.settings.modules[key];
+    return'<div class="module-row"><span class="module-name">'+mod.name+'</span><div class="toggle-switch'+(active?' active':'')+'" onclick="toggleModule(\''+key+'\')"></div></div>';
+  }).join('');
+}
+
+function toggleModule(key){
+  state.settings.modules[key]=!state.settings.modules[key];
+  saveState();
+  renderModules();
+  populateSelects();
+  toast(LIVESTOCK[key].name+' '+(state.settings.modules[key]?'enabled':'disabled'));
+}
+
+// =============================================
+// FORM HELPERS
+// =============================================
+function populateSelects(){
+  var enabled=Object.keys(state.settings.modules).filter(function(k){return state.settings.modules[k];});
+  var herdOpts='<option value="">-- Select --</option>'+state.herds.map(function(h){return'<option value="'+h.id+'">'+h.name+'</option>';}).join('');
+  ['move-herd','animal-herd','group-herd','feed-herd'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=herdOpts;});
+  
+  var paddockOpts=state.paddocks.map(function(p){return'<option value="'+p.id+'">'+p.name+'</option>';}).join('');
+  ['move-paddock','reading-paddock','obs-paddock'].forEach(function(id){var el=document.getElementById(id);if(el)el.innerHTML=paddockOpts;});
+  
+  var haySrc=document.getElementById('feed-source');
+  if(haySrc)haySrc.innerHTML=state.hayInventory.filter(function(h){return h.qty>0;}).map(function(h){
+    var loc=state.storageLocations.find(function(l){return l.id===h.location;});
+    return'<option value="'+h.id+'">'+h.type.replace(/_/g,' ')+' '+h.cut+' ('+h.qty+' @ '+(loc?loc.name:h.location)+')</option>';
+  }).join('');
+  
+  var speciesSel=document.getElementById('animal-species');
+  if(speciesSel){speciesSel.innerHTML=enabled.map(function(m){return'<option value="'+m+'">'+LIVESTOCK[m].name+'</option>';}).join('');updateBreeds();}
+  
+  var groupType=document.getElementById('group-type');
+  if(groupType){var opts='';enabled.forEach(function(m){LIVESTOCK[m].groupTypes.forEach(function(t){opts+='<option value="'+t.v+'">'+LIVESTOCK[m].name+' - '+t.l+'</option>';});});groupType.innerHTML=opts;}
+  
+  var healthAnimal=document.getElementById('health-animal');
+  if(healthAnimal){var opts='<option value="">-- Select --</option><optgroup label="Individuals">';state.animals.forEach(function(a){opts+='<option value="animal:'+a.id+'">'+a.tag+(a.name?' - '+a.name:'')+'</option>';});opts+='</optgroup><optgroup label="Groups">';state.groups.forEach(function(g){opts+='<option value="group:'+g.id+'">'+g.name+' ('+g.count+')</option>';});opts+='</optgroup>';healthAnimal.innerHTML=opts;}
+  
+  var animalTabs=document.getElementById('animal-tabs');
+  if(animalTabs){animalTabs.innerHTML='<div class="tab active" data-species="all">All</div>';enabled.forEach(function(m){animalTabs.innerHTML+='<div class="tab" data-species="'+m+'">'+LIVESTOCK[m].name+'</div>';});animalTabs.querySelectorAll('.tab').forEach(function(t){t.addEventListener('click',function(){animalTabs.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});this.classList.add('active');renderAnimals(this.dataset.species);});});}
+  
+  var hayLoc=document.getElementById('hay-location');
+  if(hayLoc){hayLoc.innerHTML='<option value="">-- Select --</option>'+state.storageLocations.map(function(l){return'<option value="'+l.id+'">'+l.name+'</option>';}).join('');}
+  
+  var hayField=document.getElementById('hay-field');
+  if(hayField){hayField.innerHTML='<option value="">-- Select --</option>'+state.hayFields.map(function(f){return'<option value="'+f.id+'">'+f.name+'</option>';}).join('');}
+  
+  var waterTaskLoc=document.getElementById('water-task-location');
+  if(waterTaskLoc){waterTaskLoc.innerHTML='<option value="">-- Select --</option>'+state.waterSources.map(function(w){return'<option value="'+w.id+'">'+w.name+'</option>';}).join('');}
+}
+
+function updateBreeds(){var species=document.getElementById('animal-species');var breed=document.getElementById('animal-breed');if(!species||!breed)return;var sp=species.value;if(!sp||!LIVESTOCK[sp])return;breed.innerHTML=LIVESTOCK[sp].breeds.map(function(b){return'<option value="'+b+'">'+b+'</option>';}).join('');}
+
+function updateConditions(){var sel=document.getElementById('health-animal');var species='sheep';if(sel&&sel.value){if(sel.value.startsWith('animal:')){var a=state.animals.find(function(x){return x.id===sel.value.replace('animal:','');});if(a)species=a.species;}else if(sel.value.startsWith('group:')){var g=state.groups.find(function(x){return x.id===sel.value.replace('group:','');});if(g)species=g.type.split('_')[0];}}var condSel=document.getElementById('health-condition');if(!condSel||!LIVESTOCK[species])return;condSel.innerHTML='<option value="">-- Select --</option>'+LIVESTOCK[species].conditions.map(function(c){return'<option value="'+c.toLowerCase().replace(/\s+/g,'_')+'">'+c+'</option>';}).join('');}
+
+// =============================================
+// MODAL HANDLERS
+// =============================================
+function openModal(name){document.getElementById('modal-'+name).classList.add('open');populateSelects();var today=new Date().toISOString().split('T')[0];if(name==='quick-move')document.getElementById('move-date').value=today;if(name==='feed-hay')document.getElementById('feed-date').value=today;if(name==='take-reading')updateReading();if(name==='add-health'){document.getElementById('health-date').value=today;updateConditions();}if(name==='add-observation')document.getElementById('obs-date').value=today;if(name==='add-hay')updateHayWeight();if(name==='add-fence-task')document.getElementById('fence-task-date').value=today;if(name==='add-water-task')document.getElementById('water-task-date').value=today;if(name==='add-animal'){document.getElementById('animal-modal-title').textContent='Add Animal';document.getElementById('animal-edit-id').value='';document.getElementById('animal-delete-btn').style.display='none';document.getElementById('animal-tag').value='';document.getElementById('animal-name').value='';document.getElementById('animal-weight').value='150';}}
+function closeModal(name){document.getElementById('modal-'+name).classList.remove('open');}
+
+function saveMove(){var herdId=document.getElementById('move-herd').value;var paddockId=document.getElementById('move-paddock').value;var date=document.getElementById('move-date').value;var days=parseInt(document.getElementById('move-days').value)||3;if(!herdId||!paddockId){toast('Select herd and paddock');return;}moveHerd(herdId,paddockId,days,date);closeModal('quick-move');}
+
+function saveFeed(){var herdId=document.getElementById('feed-herd').value;var hayId=document.getElementById('feed-source').value;var bales=parseInt(document.getElementById('feed-bales').value)||1;var date=document.getElementById('feed-date').value;var notes=document.getElementById('feed-notes').value;if(!herdId||!hayId){toast('Select herd and hay');return;}var hay=state.hayInventory.find(function(h){return h.id===hayId;});if(!hay||hay.qty<bales){toast('Not enough bales');return;}hay.qty-=bales;state.feedingRecords.unshift({id:'fr'+Date.now(),herdId:herdId,hayId:hayId,bales:bales,lbs:bales*hay.weight,date:new Date(date).toISOString(),notes:notes});saveState();closeModal('feed-hay');renderAll();toast('Fed '+bales+' bales');}
+
+function saveAnimal(){var editId=document.getElementById('animal-edit-id').value;var tag=document.getElementById('animal-tag').value.trim();if(!tag){toast('Tag required');return;}var data={tag:tag,name:document.getElementById('animal-name').value.trim(),species:document.getElementById('animal-species').value,breed:document.getElementById('animal-breed').value,sex:document.getElementById('animal-sex').value,weight:parseInt(document.getElementById('animal-weight').value)||150,birthdate:document.getElementById('animal-birthdate').value,status:document.getElementById('animal-status').value,herdId:document.getElementById('animal-herd').value,health:'good'};if(editId){var animal=state.animals.find(function(a){return a.id===editId;});if(animal)Object.assign(animal,data);toast('Updated');}else{data.id='a'+Date.now();state.animals.push(data);toast('Added');}saveState();closeModal('add-animal');renderAll();}
+
+function openEditAnimal(id){var a=state.animals.find(function(x){return x.id===id;});if(!a)return;populateSelects();document.getElementById('animal-modal-title').textContent='Edit Animal';document.getElementById('animal-edit-id').value=id;document.getElementById('animal-delete-btn').style.display='inline-flex';document.getElementById('animal-tag').value=a.tag;document.getElementById('animal-name').value=a.name||'';document.getElementById('animal-species').value=a.species;updateBreeds();document.getElementById('animal-breed').value=a.breed;document.getElementById('animal-sex').value=a.sex;document.getElementById('animal-weight').value=a.weight;document.getElementById('animal-birthdate').value=a.birthdate||'';document.getElementById('animal-status').value=a.status||'active';document.getElementById('animal-herd').value=a.herdId||'';document.getElementById('modal-add-animal').classList.add('open');}
+
+function deleteAnimal(){var id=document.getElementById('animal-edit-id').value;if(!id||!confirm('Delete?'))return;state.animals=state.animals.filter(function(a){return a.id!==id;});saveState();closeModal('add-animal');renderAll();toast('Deleted');}
+
+function saveHerd(){var name=document.getElementById('herd-name').value.trim();if(!name){toast('Name required');return;}state.herds.push({id:'h'+Date.now(),name:name,color:document.getElementById('herd-color').value,groups:[],paddockId:null});saveState();closeModal('add-herd');renderAll();if(map)renderHerds();toast('Herd added');}
+
+function saveGroup(){var name=document.getElementById('group-name').value.trim();if(!name){toast('Name required');return;}var newGroup={id:'g'+Date.now(),name:name,type:document.getElementById('group-type').value,count:parseInt(document.getElementById('group-count').value)||1,weight:parseInt(document.getElementById('group-weight').value)||150,herdId:document.getElementById('group-herd').value};state.groups.push(newGroup);var herd=state.herds.find(function(h){return h.id===newGroup.herdId;});if(herd){if(!herd.groups)herd.groups=[];herd.groups.push(newGroup.id);}saveState();closeModal('add-group');renderAll();if(map)renderHerds();toast('Group added');}
+
+function setDensity(d){selectedDensity=d;document.querySelectorAll('[data-density]').forEach(function(b){b.classList.toggle('active',b.dataset.density===d);});updateReading();}
+function updateReading(){var h=parseFloat(document.getElementById('reading-height').value)||10;document.getElementById('reading-height-val').textContent=h;var mult={high:250,medium:200,low:150};document.getElementById('reading-dm').textContent=(Math.max(0,h-4)*(mult[selectedDensity]||200)).toFixed(0);}
+
+function saveReading(){var paddockId=document.getElementById('reading-paddock').value;var height=parseFloat(document.getElementById('reading-height').value);var p=state.paddocks.find(function(x){return x.id===paddockId;});if(p){p.forageHeight=height;p.forageDensity=selectedDensity;}state.observations.unshift({id:'o'+Date.now(),paddockId:paddockId,type:'forage',notes:height+'" '+selectedDensity+'. '+document.getElementById('reading-notes').value,date:new Date().toISOString()});saveState();closeModal('take-reading');renderAll();if(map)renderPaddocks();toast('Reading saved');}
+
+function updateHayWeight(){var type=document.getElementById('hay-type').value;var w=state.settings.hayWeights||{round_4x5:850,round_5x5:1100,square_small:45,square_3x4:1200};document.getElementById('hay-weight').value=w[type]||850;}
+
+function saveHay(){state.hayInventory.push({id:'hay'+Date.now(),type:document.getElementById('hay-type').value,cut:document.getElementById('hay-cut').value,qty:parseInt(document.getElementById('hay-qty').value)||1,weight:parseInt(document.getElementById('hay-weight').value)||850,quality:document.getElementById('hay-quality').value,location:document.getElementById('hay-location').value,field:document.getElementById('hay-field').value,notes:document.getElementById('hay-notes').value});saveState();closeModal('add-hay');renderAll();calcHay();toast('Hay added');}
+
+function deleteHay(id){state.hayInventory=state.hayInventory.filter(function(h){return h.id!==id;});saveState();renderAll();calcHay();}
+
+function calcHay(){var totalAU=state.groups.reduce(function(s,g){return s+(g.count*g.weight/1000);},0)+state.animals.reduce(function(s,a){return s+(a.weight/1000);},0);var auEl=document.getElementById('calc-au');if(auEl)auEl.value=totalAU.toFixed(1);var lbsDay=parseFloat(document.getElementById('calc-lbs').value)||26;var days=parseInt(document.getElementById('calc-days').value)||180;var waste=parseFloat(document.getElementById('calc-waste').value)||15;var base=totalAU*lbsDay*days/2000;var withWaste=base*(1+waste/100);var onHand=state.hayInventory.reduce(function(s,h){return s+(h.qty*h.weight/2000);},0);var diff=onHand-withWaste;var results=document.getElementById('hay-calc-results');if(results)results.innerHTML='<div class="calc-result"><div class="calc-result-num">'+base.toFixed(1)+'</div><div class="calc-result-lbl">Base Tons</div></div><div class="calc-result"><div class="calc-result-num">'+withWaste.toFixed(1)+'</div><div class="calc-result-lbl">With Waste</div></div><div class="calc-result" style="border-color:'+(diff>=0?'var(--grass)':'var(--danger)')+';background:'+(diff>=0?'rgba(101,163,13,0.15)':'rgba(220,38,38,0.15)')+'"><div class="calc-result-num" style="color:'+(diff>=0?'var(--grass-light)':'var(--danger)')+'">'+(diff>=0?'+':'')+diff.toFixed(1)+'</div><div class="calc-result-lbl">'+(diff>=0?'Surplus':'Deficit')+'</div></div>';}
+
+function saveHealth(){var editId=document.getElementById('health-edit-id').value;var sel=document.getElementById('health-animal').value;var animalId=null,groupName=null;if(sel&&sel.startsWith('animal:'))animalId=sel.replace('animal:','');else if(sel&&sel.startsWith('group:')){var g=state.groups.find(function(x){return x.id===sel.replace('group:','');});groupName=g?g.name:null;}var data={date:new Date(document.getElementById('health-date').value||Date.now()).toISOString(),animalId:animalId,groupName:groupName,type:document.getElementById('health-type').value,condition:document.getElementById('health-condition').value,severity:document.getElementById('health-severity').value,notes:document.getElementById('health-notes').value,withdrawal:parseInt(document.getElementById('health-withdrawal').value)||0};if(editId){var rec=state.healthRecords.find(function(r){return r.id===editId;});if(rec)Object.assign(rec,data);toast('Updated');}else{data.id='hr'+Date.now();state.healthRecords.unshift(data);toast('Saved');}saveState();closeModal('add-health');renderAll();}
+
+function openEditHealth(id){var r=state.healthRecords.find(function(x){return x.id===id;});if(!r)return;populateSelects();document.getElementById('health-modal-title').textContent='Edit Record';document.getElementById('health-edit-id').value=id;document.getElementById('health-delete-btn').style.display='inline-flex';document.getElementById('health-date').value=r.date?r.date.split('T')[0]:'';if(r.animalId)document.getElementById('health-animal').value='animal:'+r.animalId;document.getElementById('health-type').value=r.type;updateConditions();document.getElementById('health-condition').value=r.condition||'';document.getElementById('health-severity').value=r.severity;document.getElementById('health-notes').value=r.notes||'';document.getElementById('health-withdrawal').value=r.withdrawal||0;document.getElementById('modal-add-health').classList.add('open');}
+
+function deleteHealth(){var id=document.getElementById('health-edit-id').value;if(!id||!confirm('Delete?'))return;state.healthRecords=state.healthRecords.filter(function(r){return r.id!==id;});saveState();closeModal('add-health');renderAll();toast('Deleted');}
+
+function saveObs(){var editId=document.getElementById('obs-edit-id').value;var data={paddockId:document.getElementById('obs-paddock').value,type:document.getElementById('obs-type').value,notes:document.getElementById('obs-notes').value,date:new Date(document.getElementById('obs-date').value||Date.now()).toISOString()};if(editId){var obs=state.observations.find(function(o){return o.id===editId;});if(obs)Object.assign(obs,data);toast('Updated');}else{data.id='o'+Date.now();state.observations.unshift(data);toast('Saved');}saveState();closeModal('add-observation');renderAll();}
+
+function openEditObs(id){var o=state.observations.find(function(x){return x.id===id;});if(!o)return;populateSelects();document.getElementById('obs-modal-title').textContent='Edit Observation';document.getElementById('obs-edit-id').value=id;document.getElementById('obs-delete-btn').style.display='inline-flex';document.getElementById('obs-paddock').value=o.paddockId;document.getElementById('obs-type').value=o.type;document.getElementById('obs-date').value=o.date?o.date.split('T')[0]:'';document.getElementById('obs-notes').value=o.notes||'';document.getElementById('modal-add-observation').classList.add('open');}
+
+function deleteObs(){var id=document.getElementById('obs-edit-id').value;if(!id||!confirm('Delete?'))return;state.observations=state.observations.filter(function(o){return o.id!==id;});saveState();closeModal('add-observation');renderAll();toast('Deleted');}
+
+function saveFenceEquipment(){state.fenceEquipment.push({id:'fe'+Date.now(),type:document.getElementById('fence-equip-type').value,qty:parseInt(document.getElementById('fence-equip-qty').value)||1,location:document.getElementById('fence-equip-location').value,condition:document.getElementById('fence-equip-condition').value,notes:document.getElementById('fence-equip-notes').value});saveState();closeModal('add-fence-equipment');renderAll();toast('Equipment added');}
+
+function deleteFenceEquip(id){state.fenceEquipment=state.fenceEquipment.filter(function(e){return e.id!==id;});saveState();renderAll();}
+
+function deleteFenceLine(id){state.fenceLines=state.fenceLines.filter(function(f){return f.id!==id;});saveState();renderAll();if(map)renderFenceLines();}
+
+function deleteGate(id){state.gates=state.gates.filter(function(g){return g.id!==id;});saveState();renderAll();}
+
+function saveFenceTask(){state.fenceTasks.unshift({id:'ft'+Date.now(),type:document.getElementById('fence-task-type').value,status:document.getElementById('fence-task-status').value,location:document.getElementById('fence-task-location').value,date:new Date(document.getElementById('fence-task-date').value||Date.now()).toISOString(),notes:document.getElementById('fence-task-notes').value});saveState();closeModal('add-fence-task');renderAll();toast('Task saved');}
+
+function saveWaterPoint(){state.waterSources.push({id:'w'+Date.now(),name:document.getElementById('water-name').value.trim(),type:document.getElementById('water-type').value,capacity:parseInt(document.getElementById('water-capacity').value)||null,status:document.getElementById('water-status').value,paddocks:document.getElementById('water-paddocks').value,notes:document.getElementById('water-notes').value,lat:null,lng:null});saveState();closeModal('add-water-point');renderAll();toast('Water source added');}
+
+function deleteWaterSource(id){state.waterSources=state.waterSources.filter(function(w){return w.id!==id;});saveState();renderAll();if(map)renderWaterPoints();}
+
+function saveWaterTask(){state.waterTasks.unshift({id:'wt'+Date.now(),type:document.getElementById('water-task-type').value,status:document.getElementById('water-task-status').value,locationId:document.getElementById('water-task-location').value,date:new Date(document.getElementById('water-task-date').value||Date.now()).toISOString(),notes:document.getElementById('water-task-notes').value});saveState();closeModal('add-water-task');renderAll();toast('Task saved');}
+
+function saveLocation(){var name=document.getElementById('location-name').value.trim();if(!name){toast('Name required');return;}state.storageLocations.push({id:'loc'+Date.now(),name:name,notes:document.getElementById('location-notes').value});saveState();closeModal('add-location');renderAll();toast('Location added');}
+
+function deleteLocation(id){state.storageLocations=state.storageLocations.filter(function(l){return l.id!==id;});saveState();renderAll();}
+
+function saveField(){var name=document.getElementById('field-name').value.trim();if(!name){toast('Name required');return;}state.hayFields.push({id:'fld'+Date.now(),name:name,acres:parseFloat(document.getElementById('field-acres').value)||null,notes:document.getElementById('field-notes').value});saveState();closeModal('add-field');renderAll();toast('Field added');}
+
+function deleteField(id){state.hayFields=state.hayFields.filter(function(f){return f.id!==id;});saveState();renderAll();}
+
+function loadSettings(){
+  var s=state.settings;
+  if(s.hayWeights){
+    document.getElementById('setting-round45').value=s.hayWeights.round_4x5||850;
+    document.getElementById('setting-round55').value=s.hayWeights.round_5x5||1100;
+    document.getElementById('setting-smallsq').value=s.hayWeights.square_small||45;
+    document.getElementById('setting-largesq').value=s.hayWeights.square_3x4||1200;
+  }
+  document.getElementById('setting-cuts').value=s.cutsPerYear||2;
+  document.getElementById('setting-waste').value=s.defaultWaste||15;
+}
+
+function saveSettings(){
+  state.settings.hayWeights={
+    round_4x5:parseInt(document.getElementById('setting-round45').value)||850,
+    round_5x5:parseInt(document.getElementById('setting-round55').value)||1100,
+    square_small:parseInt(document.getElementById('setting-smallsq').value)||45,
+    square_3x4:parseInt(document.getElementById('setting-largesq').value)||1200
+  };
+  state.settings.cutsPerYear=parseInt(document.getElementById('setting-cuts').value)||2;
+  state.settings.defaultWaste=parseInt(document.getElementById('setting-waste').value)||15;
+  saveState();
+  toast('Settings saved');
+}
+
+function clearAllData(){
+  if(!confirm('Reset ALL data? This cannot be undone.'))return;
+  localStorage.removeItem(STORAGE_KEY);
+  location.reload();
+}
+
+// =============================================
+// FARMOS EXPORT (with Inventory Module for hay)
+// =============================================
+function exportFarmOS(){
+  function uuid(){return'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16);});}
+  
+  // Animals as asset--animal
+  var animals=state.animals.map(function(a){return{type:'asset--animal',id:uuid(),attributes:{name:a.name||a.tag,status:a.status==='culled'?'archived':'active',sex:a.sex,birthdate:a.birthdate||null},relationships:{animal_type:{data:{type:'taxonomy_term--animal_type',id:uuid()}}},meta:{id_tag:[{id:a.tag,type:'ear_tag',location:'ear'}],grazing_manager_id:a.id}};});
+  
+  // Paddocks as asset--land
+  var lands=state.paddocks.map(function(p){return{type:'asset--land',id:uuid(),attributes:{name:p.name,status:'active',land_type:p.type==='silvopasture'?'pasture':(p.type||'field'),is_location:true,is_fixed:true,intrinsic_geometry:p.coords&&p.coords.length?{type:'Polygon',coordinates:[p.coords]}:null},meta:{grazing_manager_id:p.id,acres:parseFloat(p.acres)}};});
+  
+  // Hay as asset--material (FarmOS Inventory Module format)
+  var hayAssets=state.hayInventory.map(function(h){var loc=state.storageLocations.find(function(l){return l.id===h.location;});return{type:'asset--material',id:uuid(),attributes:{name:h.type.replace(/_/g,' ')+' '+h.cut+' cut hay',status:'active'},relationships:{material_type:{data:{type:'taxonomy_term--material_type',id:uuid(),meta:{name:'Hay'}}}},meta:{grazing_manager_id:h.id,inventory:{measure:'count',value:h.qty,units:'bales',weight_per_unit_lbs:h.weight,location:loc?loc.name:h.location,quality:h.quality}}};});
+  
+  // Feeding records as log--activity with quantity inventory_adjustment: decrement
+  var feedingLogs=state.feedingRecords.map(function(r){var herd=state.herds.find(function(h){return h.id===r.herdId;});var hay=state.hayInventory.find(function(h){return h.id===r.hayId;});return{type:'log--activity',id:uuid(),attributes:{name:'Feed '+(hay?hay.type.replace(/_/g,' '):'')+' to '+(herd?herd.name:'herd'),timestamp:Math.floor(new Date(r.date).getTime()/1000),status:'done',notes:{value:r.notes||'',format:'default'}},relationships:{asset:[{type:'asset--group',id:uuid(),meta:{name:herd?herd.name:''}}],quantity:[{type:'quantity--standard',attributes:{measure:'count',value:r.bales,units:'bales',label:'Hay fed',inventory_adjustment:'decrement',inventory_asset:{type:'asset--material',meta:{name:hay?hay.type.replace(/_/g,' ')+' hay':''}}}}]},meta:{grazing_manager_id:r.id,lbs_fed:r.lbs}};});
+  
+  // Movements as log--activity with is_movement, using recorded date
+  var moveLogs=state.grazingEvents.map(function(e){var herd=state.herds.find(function(h){return h.id===e.herdId;});var paddock=state.paddocks.find(function(p){return p.id===e.paddockId;});return{type:'log--activity',id:uuid(),attributes:{name:'Move '+(herd?herd.name:'herd')+' to '+(paddock?paddock.name:'paddock'),timestamp:Math.floor(new Date(e.date).getTime()/1000),status:'done',is_movement:true},relationships:{asset:[{type:'asset--group',id:uuid(),meta:{name:herd?herd.name:''}}],location:[{type:'asset--land',id:uuid(),meta:{name:paddock?paddock.name:''}}]},meta:{grazing_manager_id:e.id,planned_days:e.days,end_date:e.endDate}};});
+  
+  // Observations as log--observation
+  var obsLogs=state.observations.map(function(o){var paddock=state.paddocks.find(function(p){return p.id===o.paddockId;});return{type:'log--observation',id:uuid(),attributes:{name:o.type+' observation - '+(paddock?paddock.name:'Unknown'),timestamp:Math.floor(new Date(o.date).getTime()/1000),status:'done',notes:{value:o.notes||'',format:'default'}},relationships:{location:paddock?[{type:'asset--land',id:uuid(),meta:{name:paddock.name}}]:[]},meta:{grazing_manager_id:o.id}};});
+  
+  // Fence tasks as log--maintenance
+  var fenceLogs=state.fenceTasks.map(function(t){return{type:'log--maintenance',id:uuid(),attributes:{name:'Fence '+t.type+': '+(t.location||'Unknown'),timestamp:Math.floor(new Date(t.date).getTime()/1000),status:t.status==='done'?'done':'pending',notes:{value:t.notes||'',format:'default'}},meta:{grazing_manager_id:t.id}};});
+  
+  // Water tasks as log--maintenance
+  var waterLogs=state.waterTasks.map(function(t){var loc=state.waterSources.find(function(w){return w.id===t.locationId;});return{type:'log--maintenance',id:uuid(),attributes:{name:'Water '+t.type+': '+(loc?loc.name:t.location||'Unknown'),timestamp:Math.floor(new Date(t.date).getTime()/1000),status:t.status==='done'?'done':'pending',notes:{value:t.notes||'',format:'default'}},meta:{grazing_manager_id:t.id}};});
+  
+  var exportData={
+    jsonapi:{version:'1.0'},
+    meta:{
+      generator:'Tuckaway Grazing Manager v4',
+      exported:new Date().toISOString(),
+      farm:'Tuckaway Farm',
+      farmos_modules:['farm_inventory'],
+      notes:'Hay tracked as asset--material. Feeding uses quantity.inventory_adjustment:decrement. Movements recorded with specific dates for timeline tracking.'
+    },
+    data:{
+      assets:{animals:animals,lands:lands,materials:hayAssets},
+      logs:{activities:feedingLogs.concat(moveLogs),observations:obsLogs,maintenance:fenceLogs.concat(waterLogs)}
+    }
+  };
+  
+  var blob=new Blob([JSON.stringify(exportData,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='farmos-export-'+new Date().toISOString().split('T')[0]+'.json';a.click();
+  URL.revokeObjectURL(url);
+  toast('FarmOS JSON exported');
+}
+
+function exportGeoJSON(){
+  var features=state.paddocks.filter(function(p){return p.coords&&p.coords.length;}).map(function(p){return{type:'Feature',geometry:{type:'Polygon',coordinates:[p.coords]},properties:{id:p.id,name:p.name,acres:parseFloat(p.acres),type:p.type,color:p.color}};});
+  
+  // Add fence lines
+  state.fenceLines.filter(function(f){return f.coords&&f.coords.length;}).forEach(function(f){
+    features.push({type:'Feature',geometry:{type:'LineString',coordinates:f.coords},properties:{id:f.id,name:f.name,type:'fence_'+f.type}});
+  });
+  
+  // Add water points
+  state.waterSources.filter(function(w){return w.lat&&w.lng;}).forEach(function(w){
+    features.push({type:'Feature',geometry:{type:'Point',coordinates:[w.lng,w.lat]},properties:{id:w.id,name:w.name,type:'water_'+w.type}});
+  });
+  
+  var geojson={type:'FeatureCollection',features:features};
+  var blob=new Blob([JSON.stringify(geojson,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download='farm-features-'+new Date().toISOString().split('T')[0]+'.geojson';a.click();
+  URL.revokeObjectURL(url);
+  toast('GeoJSON exported');
+}
+
+function importData(event){
+  var file=event.target.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var imported=JSON.parse(e.target.result);
+      state=Object.assign({},state,imported.data||imported);
+      saveState();renderAll();
+      if(map){renderPaddocks();renderHerds();renderFenceLines();renderWaterPoints();}
+      toast('Data imported');
+    }catch(err){toast('Import error: '+err.message);}
+  };
+  reader.readAsText(file);
+  event.target.value='';
+}
+
+function toast(msg){
+  document.getElementById('toast-msg').textContent=msg;
+  var t=document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(function(){t.classList.remove('show');},2500);
+}
+</script>
+</body>
+</html>
