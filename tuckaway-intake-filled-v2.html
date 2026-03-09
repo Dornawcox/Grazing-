@@ -1,0 +1,1993 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Talk to the Farm — Grazing Intake System</title>
+<style>
+:root {
+  --forest: #1a2e0a;
+  --forest-mid: #243d10;
+  --grass: #4d7c0f;
+  --grass-light: #65a30d;
+  --amber: #d4a030;
+  --hay: #ca8a04;
+  --earth: #78350f;
+  --parchment: #faf5e4;
+  --muted: #6b7280;
+  --danger: #dc2626;
+  --water: #0ea5e9;
+  --card: #fffdf8;
+  --line: rgba(77,124,15,0.3);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--parchment); color: #2a2a2a; line-height: 1.5; }
+
+/* Header */
+header {
+  background: var(--forest);
+  color: var(--parchment);
+  padding: 16px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 3px solid var(--grass);
+}
+header h1 { font-size: 20px; font-weight: 700; }
+header p { font-size: 12px; color: var(--grass-light); margin-top: 2px; }
+
+/* Navigation */
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--forest-mid);
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.nav-tab {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid transparent;
+  color: rgba(250,245,228,0.6);
+  cursor: pointer;
+  border-radius: 6px;
+}
+.nav-tab:hover { color: var(--parchment); background: rgba(255,255,255,0.05); }
+.nav-tab.active { background: rgba(101,163,13,0.2); border-color: var(--grass); color: var(--grass-light); }
+
+/* Main content */
+main { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.page { display: none; }
+.page.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.card-header {
+  padding: 12px 16px;
+  background: linear-gradient(to right, rgba(101,163,13,0.08), transparent);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title { font-size: 14px; font-weight: 600; color: var(--forest); }
+.card-body { padding: 16px; }
+
+/* Typography */
+h2 { font-size: 18px; color: var(--forest); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--grass); }
+h3 { font-size: 14px; color: var(--grass); margin: 16px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+h4 { font-size: 13px; color: var(--earth); margin: 12px 0 6px; }
+p { margin-bottom: 10px; font-size: 14px; }
+ul, ol { margin: 8px 0 12px 20px; font-size: 14px; }
+li { margin-bottom: 6px; }
+blockquote {
+  background: rgba(101,163,13,0.08);
+  border-left: 4px solid var(--grass);
+  padding: 12px 16px;
+  margin: 12px 0;
+  font-style: italic;
+  border-radius: 0 8px 8px 0;
+}
+
+/* Tags */
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-right: 4px;
+}
+.tag-goal { background: rgba(101,163,13,0.15); color: var(--grass); }
+.tag-concern { background: rgba(212,160,48,0.15); color: var(--hay); }
+.tag-action { background: rgba(14,165,233,0.15); color: var(--water); }
+.tag-decision { background: rgba(120,53,15,0.15); color: var(--earth); }
+.tag-herd { background: rgba(220,38,38,0.1); color: var(--danger); }
+.tag-pcs { background: rgba(107,114,128,0.15); color: var(--muted); }
+
+/* Section markers */
+.section-time {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--muted);
+  background: rgba(107,114,128,0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+/* Question blocks */
+.question-block {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.question-block .q-num {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  background: var(--grass);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 22px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+.question-block .q-text { font-weight: 500; }
+.question-block .q-prompts { margin-top: 8px; padding-left: 30px; font-size: 13px; color: var(--muted); }
+.question-block .q-prompts li { margin-bottom: 4px; }
+.question-block .q-tag-hint {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: rgba(77,124,15,0.05);
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+}
+
+/* Grid layouts */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media (max-width: 768px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+/* Forms */
+label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; }
+input, select, textarea {
+  width: 100%;
+  font-size: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 12px;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--grass); box-shadow: 0 0 0 3px rgba(101,163,13,0.1); }
+textarea { min-height: 100px; resize: vertical; font-family: inherit; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-primary { background: var(--grass); color: white; }
+.btn-primary:hover { background: var(--grass-light); }
+.btn-secondary { background: rgba(101,163,13,0.1); color: var(--grass); border: 1px solid var(--line); }
+.btn-secondary:hover { background: rgba(101,163,13,0.2); }
+.btn-danger { background: rgba(220,38,38,0.1); color: var(--danger); border: 1px solid rgba(220,38,38,0.3); }
+.btn-amber { background: var(--amber); color: white; }
+
+/* Import form specific */
+.import-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; }
+@media (max-width: 900px) { .import-grid { grid-template-columns: 1fr; } }
+
+.gap-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(212,160,48,0.08);
+  border-left: 3px solid var(--amber);
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.gap-item.resolved { background: rgba(101,163,13,0.08); border-left-color: var(--grass); }
+.gap-icon { font-size: 16px; }
+
+.payload-preview {
+  background: var(--forest);
+  color: var(--grass-light);
+  padding: 14px;
+  border-radius: 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* PCS Grid */
+.pcs-grid {
+  display: grid;
+  grid-template-columns: 2fr repeat(5, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 12px;
+}
+.pcs-grid > div {
+  background: #fff;
+  padding: 8px 10px;
+}
+.pcs-grid .pcs-header {
+  background: rgba(101,163,13,0.1);
+  font-weight: 600;
+  text-align: center;
+}
+.pcs-grid .pcs-indicator { background: rgba(101,163,13,0.03); font-weight: 500; }
+.pcs-grid input[type="radio"] { margin: 0; cursor: pointer; }
+.pcs-grid .pcs-cell { text-align: center; }
+
+/* Collapsible sections */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 10px 14px;
+  background: rgba(101,163,13,0.05);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.collapsible-header:hover { background: rgba(101,163,13,0.1); }
+.collapsible-content { display: none; padding: 12px 0; }
+.collapsible-content.open { display: block; }
+.chevron { transition: transform 0.2s; }
+.chevron.open { transform: rotate(180deg); }
+
+/* Print styles */
+@media print {
+  header, .nav-tabs, .btn { display: none; }
+  .page { display: block !important; page-break-before: always; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+}
+</style>
+</head>
+<body>
+<header>
+<h1>🌾 Talk to the Farm — Grazing Intake System</h1>
+<p>Conversational site assessment for regenerative grazing operations</p>
+</header>
+<nav class="nav-tabs">
+<button class="nav-tab active" data-page="guide">Field Guide</button>
+<button class="nav-tab" data-page="questions">Question Set</button>
+<button class="nav-tab" data-page="pcs">PCS Scoring</button>
+<button class="nav-tab" data-page="import">Import Form</button>
+<button class="nav-tab" data-page="schema">Data Schema</button>
+</nav>
+<main>
+<!-- ============================================ -->
+<!-- PAGE: FIELD GUIDE -->
+<!-- ============================================ -->
+<section class="page active" id="page-guide">
+<div class="card">
+<div class="card-header">
+<span class="card-title">Overview</span>
+</div>
+<div class="card-body">
+<p>This intake system is designed to generate a transcript from a field walk or remote session that can <strong>immediately populate a farm's grazing management site</strong>. It aligns with:</p>
+<ul>
+<li><strong>NRCS Grazing Plan Checklist/Worksheet</strong> — objectives + inventory + plan elements</li>
+<li><strong>Pasture Condition Scoring (PCS)</strong> — 10 indicators to benchmark pasture condition</li>
+<li><strong>Prescribed Grazing (528)</strong> — monitoring data + grazing records emphasis</li>
+</ul>
+<p>The result: a working grazing dashboard from day one, with paddock maps, herd tracking, movement logs, and baseline observations.</p>
+</div>
+</div>
+<div class="grid-2">
+<div class="card">
+<div class="card-header"><span class="card-title">Session Modes</span></div>
+<div class="card-body">
+<h4>🚶 In-Person Field Walk (60–90 min)</h4>
+<p>Walk the farm with the producer. Stop at key paddocks for PCS observations. Record with phone/tablet.</p>
+<h4>📹 Zoom / Remote Walk-Through (45–60 min)</h4>
+<p>Producer walks with phone camera. Share screen for map markup. Record session for transcript.</p>
+<h4>📞 Phone Intake (30–45 min)</h4>
+<p>Shorter discovery call. Follow up with map + photos. Best for initial scoping.</p>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Transcript Tags</span></div>
+<div class="card-body">
+<p>Encourage assessors to speak these tags aloud for easier parsing:</p>
+<p><span class="tag tag-goal">GOAL:</span> Producer objectives</p>
+<p><span class="tag tag-concern">CONCERN:</span> Resource concerns, risks</p>
+<p><span class="tag tag-action">ACTION:</span> Tasks, improvements planned</p>
+<p><span class="tag tag-decision">DECISION:</span> Management choices</p>
+<p><span class="tag tag-herd">HERD:</span> / <span class="tag tag-herd">GROUP:</span> Livestock info</p>
+<p><span class="tag tag-pcs">PCS:</span> Pasture condition observations</p>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Post-Processing Pipeline</span></div>
+<div class="card-body">
+<div class="grid-3">
+<div style="text-align:center;padding:16px;background:rgba(101,163,13,0.05);border-radius:8px;">
+<div style="font-size:28px;margin-bottom:6px;">🎙️</div>
+<strong>1. Capture</strong>
+<p style="font-size:12px;color:var(--muted);margin:6px 0 0;">Record session, generate transcript (auto or manual)</p>
+</div>
+<div style="text-align:center;padding:16px;background:rgba(212,160,48,0.08);border-radius:8px;">
+<div style="font-size:28px;margin-bottom:6px;">🔍</div>
+<strong>2. Extract</strong>
+<p style="font-size:12px;color:var(--muted);margin:6px 0 0;">Parse entities: paddocks, herds, moves, observations, economics</p>
+</div>
+<div style="text-align:center;padding:16px;background:rgba(14,165,233,0.1);border-radius:8px;">
+<div style="font-size:28px;margin-bottom:6px;">📥</div>
+<strong>3. Import</strong>
+<p style="font-size:12px;color:var(--muted);margin:6px 0 0;">Review, fill gaps, submit to grazing site</p>
+</div>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">What Gets Populated</span></div>
+<div class="card-body">
+<div class="grid-2">
+<div>
+<h4>Immediate Utility</h4>
+<ul>
+<li>Farm profile + objectives (NRCS worksheet style)</li>
+<li>Paddock list with names, acres, coordinates</li>
+<li>Herd &amp; group inventory with headcounts, weights</li>
+<li>Seed movement logs (last 3 moves → timeline)</li>
+<li>Water system map + reliability notes</li>
+<li>Fence infrastructure summary</li>
+</ul>
+</div>
+<div>
+<h4>Baseline Data</h4>
+<ul>
+<li>PCS observations by paddock (10 indicators)</li>
+<li>Photo points + monitoring targets</li>
+<li>Economics defaults (labor rate, hay cost)</li>
+<li>Health/compliance reminders</li>
+<li>Resource concern priorities</li>
+<li>Action items + follow-up tasks</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ============================================ -->
+<!-- PAGE: QUESTION SET -->
+<!-- ============================================ -->
+<section class="page" id="page-questions">
+<h2>Conversational Question Set</h2>
+<p>Administered by grazing specialist or conservation district staff. Designed for natural conversation flow with structured data capture.</p>
+<!-- Section A: Opening -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">A. Opening</span>
+<span class="section-time">2–3 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Permission + context + how we'll use the transcript</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"Is it okay if I record and/or generate a transcript so we can turn it into a draft grazing plan and your farm dashboard?"</span>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"What's the single most important outcome you want from today's walk/call?"</span>
+<div class="q-tag-hint">Tag: GOAL: [response]</div>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"Are there any non-negotiables? Things we absolutely can't compromise on?"</span>
+<ul class="q-prompts">
+<li>Animal welfare requirements</li>
+<li>Water quality / stream protection</li>
+<li>Time constraints / labor limits</li>
+<li>Budget boundaries</li>
+<li>Lease restrictions</li>
+</ul>
+<div class="q-tag-hint">Tag: CONCERN: [response]</div>
+</div>
+</div>
+</div>
+<!-- Section B: Farm Snapshot -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">B. Farm Snapshot</span>
+<span class="section-time">5 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Populate farm profile and basic site configuration</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"What do you call this operation and where is it located?"</span>
+<ul class="q-prompts">
+<li>Farm/ranch name</li>
+<li>Town, county, state</li>
+<li>Tract/farm numbers (if used)</li>
+<li>Total acres managed</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"Who's involved day-to-day? What are the key roles?"</span>
+<ul class="q-prompts">
+<li>Primary manager/decision-maker</li>
+<li>Labor help (family, hired, seasonal)</li>
+<li>Who does daily moves/checks?</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"What's your grazing season look like?"</span>
+<ul class="q-prompts">
+<li>Year-round vs. seasonal</li>
+<li>Stockpile periods</li>
+<li>Sacrifice area use</li>
+<li>When do animals come off pasture?</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">4</span>
+<span class="q-text">"What are your primary enterprises and how do you market?"</span>
+<ul class="q-prompts">
+<li>Species: beef, dairy, sheep, goats, mixed</li>
+<li>Marketing: direct, auction, contract, freezer beef</li>
+<li>Any certifications or protocols (organic, grass-fed, etc.)</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Section C: Objectives -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">C. Objectives &amp; Resource Concerns</span>
+<span class="section-time">7–10 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Populate objectives module and align with NRCS checklists</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"What are your top 3 objectives for the next 12 months?"</span>
+<p style="margin-top:8px;font-size:13px;">Ask open-ended first, then confirm with prompts:</p>
+<ul class="q-prompts">
+<li>Reduce hay feeding days?</li>
+<li>Improve pasture utilization / recovery?</li>
+<li>Improve water quality / streambank stability?</li>
+<li>Increase profit / reduce labor?</li>
+<li>Increase drought resilience?</li>
+<li>Improve soil health / carbon?</li>
+<li>Better animal performance / weight gains?</li>
+</ul>
+<div class="q-tag-hint">Tag: GOAL: [each objective]</div>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"Which resource concerns are most pressing right now?"</span>
+<ul class="q-prompts">
+<li>Soil: erosion, compaction, organic matter</li>
+<li>Water: quality, availability, reliability</li>
+<li>Plants: species composition, productivity, weeds</li>
+<li>Animals: health, performance, handling</li>
+<li>Energy/infrastructure: fence, water system, handling</li>
+</ul>
+<div class="q-tag-hint">Tag: CONCERN: [each concern]</div>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"What would 'success' look like by the end of the season? Can you put a number on it?"</span>
+<ul class="q-prompts">
+<li>Days on pasture (e.g., "extend by 30 days")</li>
+<li>Stocking rate target</li>
+<li>Moves per week</li>
+<li>Recovery period achieved</li>
+<li>Hay reduction (tons or $)</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Section D: Livestock Inventory -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">D. Livestock Inventory</span>
+<span class="section-time">8–10 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Generate herds/groups/animals + performance hooks</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"What classes of livestock do you manage as separate units?"</span>
+<ul class="q-prompts">
+<li>Cow/calf pairs</li>
+<li>Replacement heifers</li>
+<li>Stockers / backgrounders</li>
+<li>Bulls / breeding groups</li>
+<li>Sheep: ewes, lambs, rams</li>
+<li>Goats: does, kids, bucks</li>
+<li>Mixed species (flerds)</li>
+</ul>
+<div class="q-tag-hint">Tag: HERD: [name]</div>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"For each group: headcount, average weight, and any tagged individuals?"</span>
+<div class="q-tag-hint">Tag: GROUP: [name], [herd], [count], [avg_weight]<br/>Tag: ANIMAL: [tag], [name], [species]</div>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"When do animals enter or leave the grazing platform?"</span>
+<ul class="q-prompts">
+<li>Calving/lambing dates</li>
+<li>Weaning timing</li>
+<li>When stockers arrive/ship</li>
+<li>Seasonal changes to herd composition</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">4</span>
+<span class="q-text">"Any special management groups?"</span>
+<ul class="q-prompts">
+<li>Breeding groups / cleanup bulls</li>
+<li>High-risk animals (thin, sick, young)</li>
+<li>Animals in withdrawal</li>
+<li>Guardian animals</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Section E: Land & Paddocks -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">E. Land &amp; Paddock Inventory</span>
+<span class="section-time">10–15 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Populate paddocks, acres, map layers, notes</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"How many paddocks or management areas do you use? Let's name them and get rough acres."</span>
+<div class="q-tag-hint">Tag: PADDOCK: [name], [acres], [type]</div>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"Walk me through the layout. Where are the lanes, gates, and pinch points?"</span>
+<ul class="q-prompts">
+<li>Main lanes / alleyways</li>
+<li>Gate locations and access</li>
+<li>Bottlenecks or problem spots</li>
+<li>Handling facilities location</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"Any areas with special rules or off-limits?"</span>
+<ul class="q-prompts">
+<li>Riparian buffers / setbacks</li>
+<li>Wetlands / seasonal wet areas</li>
+<li>Steep slopes</li>
+<li>Sensitive habitat / wildlife areas</li>
+<li>Hay ground not grazed</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">4</span>
+<span class="q-text">"Any leased ground or shared pastures? Different rules there?"</span>
+</div>
+</div>
+</div>
+<!-- Section F: Water -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">F. Water System Walk-Through</span>
+<span class="section-time">10 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Populate water points, reliability, frost issues</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"Where do animals drink in each major area?"</span>
+<ul class="q-prompts">
+<li>Troughs / tanks (capacity?)</li>
+<li>Frost-free hydrants</li>
+<li>Streams / creek crossings</li>
+<li>Ponds / spring developments</li>
+<li>Portable tanks you move</li>
+</ul>
+<div class="q-tag-hint">Tag: WATER: [name], [type], [paddocks], [capacity]</div>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"Which water points are reliable in drought? Which ones fail first?"</span>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"What fails in winter? Freeze-ups, line issues, hauling?"</span>
+<ul class="q-prompts">
+<li>Which lines freeze?</li>
+<li>How long to thaw/fix?</li>
+<li>Backup plan when frozen?</li>
+<li>Labor/time cost of winter water?</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">4</span>
+<span class="q-text">"If you could fix ONE water bottleneck this year, what would it be?"</span>
+<div class="q-tag-hint">Tag: ACTION: water improvement — [description]</div>
+</div>
+</div>
+</div>
+<!-- Section G: Fence -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">G. Fence &amp; Handling System</span>
+<span class="section-time">8–10 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Populate fence assets, efficiency bottlenecks</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"What's your perimeter fence? Type and condition?"</span>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"How do you subdivide for rotations?"</span>
+<ul class="q-prompts">
+<li>Polywire / reels / step-in posts</li>
+<li>Electronet / netting</li>
+<li>Permanent interior divisions</li>
+<li>Number of paddocks you can create</li>
+</ul>
+<div class="q-tag-hint">Tag: FENCE: [type], [qty], [condition]</div>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"What slows you down on moves?"</span>
+<ul class="q-prompts">
+<li>Reel tangles / broken wire</li>
+<li>Gate locations inconvenient</li>
+<li>Energizer issues / grounding</li>
+<li>Vegetation shorting fence</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">4</span>
+<span class="q-text">"Any chronic 'fence down' spots or wildlife pressure?"</span>
+</div>
+</div>
+</div>
+<!-- Section H: Grazing Behavior -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">H. Grazing Plan Behavior</span>
+<span class="section-time">12–15 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Generate movement logs, rotation metrics, monitoring approach</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"How often do you move animals today? What triggers a move?"</span>
+<ul class="q-prompts">
+<li>Time-based (every X days)</li>
+<li>Height-based (graze to X inches)</li>
+<li>Utilization / residual target</li>
+<li>Weather-driven</li>
+<li>Animal behavior (restless, bawling)</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"What's your target rest period? How does it vary by season?"</span>
+<ul class="q-prompts">
+<li>Spring (fast growth)</li>
+<li>Summer (slower, drought)</li>
+<li>Fall (stockpiling)</li>
+<li>Winter (dormant)</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"Where do you typically start the season? Where do you end?"</span>
+<ul class="q-prompts">
+<li>Sacrifice area strategy</li>
+<li>Stockpile paddocks</li>
+<li>Calving/lambing areas</li>
+</ul>
+</div>
+<div class="question-block" style="background:rgba(101,163,13,0.05);">
+<span class="q-num">4</span>
+<span class="q-text">"Tell me about your last 3 moves — when, where, which animals, and why."</span>
+<p style="margin:8px 0 0;font-size:12px;color:var(--grass);font-weight:600;">⭐ This seeds immediate movement logs and timeline data</p>
+<div class="q-tag-hint">Tag: MOVE: [date], [herd], [from], [to], [reason]</div>
+</div>
+<div class="question-block">
+<span class="q-num">5</span>
+<span class="q-text">"What's your 'can't miss' monitoring metric?"</span>
+<ul class="q-prompts">
+<li>Residual height</li>
+<li>Ground cover %</li>
+<li>Utilization estimate</li>
+<li>Animal behavior / body condition</li>
+<li>Species composition</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Section I: PCS -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">I. Pasture Condition Observations (PCS)</span>
+<span class="section-time">15–25 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Generate baseline without paperwork slog</p>
+<p>PCS uses <strong>10 indicators</strong> scored 1–5. Use conversationally:</p>
+<blockquote>
+        "For each of these, tell me: where on the farm is this <em>worst</em>? Where is it <em>best</em>? Which paddocks should we score today as a benchmark?"
+      </blockquote>
+<div class="grid-2" style="margin-top:16px;">
+<div>
+<h4>1. Plant Community (Desirable Species %)</h4>
+<p style="font-size:13px;">"What's dominating here? Do you see diversity — cool-season grasses, legumes, warm-season?"</p>
+<h4>2. Ground Cover (%)</h4>
+<p style="font-size:13px;">"Where do you see bare soil? Is it at gates, water, mineral feeders?"</p>
+<h4>3. Erosion (Rills, Gullies)</h4>
+<p style="font-size:13px;">"Any rills or gullies? Sediment collecting in low spots?"</p>
+<h4>4. Compaction</h4>
+<p style="font-size:13px;">"Do you see pugging or hoof shear in wet periods? Where?"</p>
+<h4>5. Manure Distribution</h4>
+<p style="font-size:13px;">"Evenly spread or concentrated in certain spots?"</p>
+</div>
+<div>
+<h4>6. Undesirable Plants (Weeds)</h4>
+<p style="font-size:13px;">"Which weeds show up repeatedly? Where are they worst?"</p>
+<h4>7. Livestock Concentration Areas</h4>
+<p style="font-size:13px;">"Where do animals loaf? Shade, windbreaks, water?"</p>
+<h4>8. Residual / Utilization</h4>
+<p style="font-size:13px;">"Do you have a target residual? Is it being met?"</p>
+<h4>9. Recovery (Regrowth)</h4>
+<p style="font-size:13px;">"How long until regrowth is 'ready'? Spring vs. summer?"</p>
+<h4>10. Riparian / Stream Impacts</h4>
+<p style="font-size:13px;">"Where are banks vulnerable? Any active erosion?"</p>
+</div>
+</div>
+<div class="q-tag-hint" style="margin-top:16px;">
+        Tag: PCS: paddock=[name] indicator=[1-10] score=[1-5] note="[observation]"
+      </div>
+</div>
+</div>
+<!-- Section J: Economics -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">J. Economics, Labor &amp; Risk</span>
+<span class="section-time">8–12 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Populate defaults for immediate cost metrics</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"What's your labor constraint? Minutes per day available for moves, water checks, feeding?"</span>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"Do you have a labor rate for planning? Even if it's 'my time' — what's it worth per hour?"</span>
+<div class="q-tag-hint">Tag: ECON: laborRate=[$/hr]</div>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"What are your key input costs?"</span>
+<ul class="q-prompts">
+<li>Hay cost ($/bale or $/ton)</li>
+<li>Mineral program ($/head/year)</li>
+<li>Fuel for moves ($/move estimate)</li>
+<li>Vet/health costs ($/head/year)</li>
+</ul>
+<div class="q-tag-hint">Tag: ECON: hayCost=[value] mineralCost=[value]</div>
+</div>
+<div class="question-block">
+<span class="q-num">4</span>
+<span class="q-text">"Top 3 risks this season?"</span>
+<ul class="q-prompts">
+<li>Drought</li>
+<li>Water system failure</li>
+<li>Parasite pressure</li>
+<li>Infrastructure breakdown</li>
+<li>Labor shortage</li>
+<li>Market timing</li>
+</ul>
+<div class="q-tag-hint">Tag: CONCERN: risk — [description]</div>
+</div>
+</div>
+</div>
+<!-- Section K: Animal Performance -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">K. Animal Performance &amp; Compliance</span>
+<span class="section-time">8–12 minutes</span>
+</div>
+<div class="card-body">
+<p><strong>Goal:</strong> Populate health checks, reminders, protocols</p>
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"What's your mineral program?"</span>
+<ul class="q-prompts">
+<li>Type (loose, block, tub)</li>
+<li>Placement strategy</li>
+<li>How do you know they're consuming?</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"What health routines are you doing? What cadence is realistic?"</span>
+<ul class="q-prompts">
+<li>Vaccines (annual, seasonal)</li>
+<li>Foot checks / hoof trimming</li>
+<li>Body condition scoring</li>
+<li>Pregnancy checking</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"Parasite management — what's your approach?"</span>
+<ul class="q-prompts">
+<li>Do you do FEC / FAMACHA?</li>
+<li>When are parasites worst?</li>
+<li>Treatment products used</li>
+<li>Resistance concerns</li>
+</ul>
+</div>
+<div class="question-block">
+<span class="q-num">4</span>
+<span class="q-text">"Any withdrawal requirements we should track? Treated animals for marketing?"</span>
+</div>
+</div>
+</div>
+<!-- Section L: Close -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">L. Closing</span>
+<span class="section-time">2 minutes</span>
+</div>
+<div class="card-body">
+<div class="question-block">
+<span class="q-num">1</span>
+<span class="q-text">"What did we miss that would make this immediately useful next week?"</span>
+</div>
+<div class="question-block">
+<span class="q-num">2</span>
+<span class="q-text">"Before we end, let me confirm: herd names, paddock names/acres, and your next move plan."</span>
+</div>
+<div class="question-block">
+<span class="q-num">3</span>
+<span class="q-text">"Would you like the system to prompt follow-ups when there are gaps?"</span>
+<p style="margin-top:6px;font-size:12px;color:var(--muted);">(Default: Yes — sends SMS/email reminders for missing data)</p>
+</div>
+</div>
+</div>
+</section>
+<!-- ============================================ -->
+<!-- PAGE: PCS SCORING -->
+<!-- ============================================ -->
+<section class="page" id="page-pcs">
+<h2>Pasture Condition Scoring (PCS) Grid</h2>
+<p>Score 1–5 for each indicator. Use during field walk or from photos/video.</p>
+<div class="card">
+<div class="card-header">
+<span class="card-title">Paddock: </span>
+<select id="pcs-paddock" style="margin-left:8px;padding:4px 8px;border-radius:6px;border:1px solid var(--line);">
+<option value="">— Select paddock —</option>
+</select>
+</div>
+<div class="card-body">
+<div class="pcs-grid">
+<div class="pcs-header">Indicator</div>
+<div class="pcs-header">1<br/><small>Poor</small></div>
+<div class="pcs-header">2</div>
+<div class="pcs-header">3<br/><small>Fair</small></div>
+<div class="pcs-header">4</div>
+<div class="pcs-header">5<br/><small>Excellent</small></div>
+<div class="pcs-indicator">1. Desirable Plants %</div>
+<div class="pcs-cell"><input name="pcs1" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs1" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs1" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs1" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs1" type="radio" value="5"/></div>
+<div class="pcs-indicator">2. Ground Cover %</div>
+<div class="pcs-cell"><input name="pcs2" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs2" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs2" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs2" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs2" type="radio" value="5"/></div>
+<div class="pcs-indicator">3. Erosion</div>
+<div class="pcs-cell"><input name="pcs3" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs3" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs3" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs3" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs3" type="radio" value="5"/></div>
+<div class="pcs-indicator">4. Compaction</div>
+<div class="pcs-cell"><input name="pcs4" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs4" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs4" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs4" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs4" type="radio" value="5"/></div>
+<div class="pcs-indicator">5. Manure Distribution</div>
+<div class="pcs-cell"><input name="pcs5" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs5" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs5" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs5" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs5" type="radio" value="5"/></div>
+<div class="pcs-indicator">6. Undesirable Plants</div>
+<div class="pcs-cell"><input name="pcs6" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs6" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs6" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs6" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs6" type="radio" value="5"/></div>
+<div class="pcs-indicator">7. Livestock Concentration</div>
+<div class="pcs-cell"><input name="pcs7" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs7" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs7" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs7" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs7" type="radio" value="5"/></div>
+<div class="pcs-indicator">8. Residual / Utilization</div>
+<div class="pcs-cell"><input name="pcs8" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs8" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs8" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs8" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs8" type="radio" value="5"/></div>
+<div class="pcs-indicator">9. Recovery / Regrowth</div>
+<div class="pcs-cell"><input name="pcs9" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs9" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs9" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs9" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs9" type="radio" value="5"/></div>
+<div class="pcs-indicator">10. Riparian / Water</div>
+<div class="pcs-cell"><input name="pcs10" type="radio" value="1"/></div>
+<div class="pcs-cell"><input name="pcs10" type="radio" value="2"/></div>
+<div class="pcs-cell"><input name="pcs10" type="radio" value="3"/></div>
+<div class="pcs-cell"><input name="pcs10" type="radio" value="4"/></div>
+<div class="pcs-cell"><input name="pcs10" type="radio" value="5"/></div>
+</div>
+<label style="margin-top:16px;">Notes / Observations</label>
+<textarea id="pcs-notes" placeholder="Describe specific issues observed..."></textarea>
+<div style="margin-top:12px;">
+<button class="btn btn-primary" onclick="savePCSScore()">Save Score</button>
+<button class="btn btn-secondary" onclick="clearPCSForm()">Clear</button>
+</div>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Saved PCS Observations</span></div>
+<div class="card-body" id="pcs-saved-list">
+<p style="color:var(--muted);font-size:13px;">No observations saved yet.</p>
+</div>
+</div>
+</section>
+<!-- ============================================ -->
+<!-- PAGE: IMPORT FORM -->
+<!-- ============================================ -->
+<section class="page" id="page-import">
+<h2>Import Form</h2>
+<p>Paste transcript, extract entities, review/edit, then generate import payload.</p>
+<div class="import-grid">
+<div>
+<!-- Transcript panel -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">1. Capture</span>
+</div>
+<div class="card-body">
+<div class="grid-2">
+<div>
+<label>Farm / Ranch Name</label>
+<input id="import-farmName" placeholder="e.g., Tuckaway Farm" type="text" value="Tuckaway Farm (Lee, NH)"/>
+</div>
+<div>
+<label>Assessor</label>
+<input id="import-assessor" placeholder="e.g., Conservation District" type="text" value="Desk review (CNMP/GMP/SHMP by Northern Tilth / NRCS planning); compiled for FarmHack-in-a-Box intake"/>
+</div>
+</div>
+<div class="grid-2">
+<div>
+<label>Date</label>
+<input id="import-date" type="date" value="2026-03-09"/>
+</div>
+<div>
+<label>Session Mode</label>
+<select id="import-mode">
+<option selected="selected" value="walk">In-person field walk</option>
+<option value="zoom">Zoom / remote</option>
+<option value="phone">Phone</option>
+</select>
+</div>
+</div>
+<label>Transcript</label>
+<textarea id="import-transcript" placeholder="Paste transcript here...
+
+Example:
+Assessor: What are your top goals?
+Farmer: GOAL: Cut hay feeding by 30 days. GOAL: Improve creek bank.
+
+Assessor: Paddocks and acres?
+Farmer: North-5 is about 6 acres, South-3 about 4 acres.
+
+Assessor: Last 3 moves?
+Farmer: MOVE: March 1, Cow herd, North-5 to South-3, wet conditions" style="min-height:180px;">Assessor: Let’s start with a quick overview—what is the operation, and what are the primary enterprises?
+Farmer: Tuckaway Farm is a certified organic, diversified operation in Lee, New Hampshire, managed by the Cox family. We grow mixed vegetables (including high tunnels), heritage dent corn on small isolated plots, blueberries, and manage a large portion of open land as mixed grass/legume sod for grazing and hay. Livestock enterprises include sheep and cattle finished for direct-market meat, pasture-based poultry (broilers; with plans to reintroduce laying hens and meat turkeys), and a horse boarding enterprise (currently a small number of horses with planned growth). We import about 80 cubic yards of bedded horse manure annually for composting and crop fertility. Dog kennels are on-site but handled separately from farm nutrient cycling.
+
+Assessor: What is the current context—any recent disruptions or big changes?
+Farmer: A major barn fire destroyed livestock infrastructure and reduced livestock numbers. The CNMP models a reduced ‘current scenario’ for 2026–2027 (~15 animal units) while rebuilding, and a ‘future scenario’ starting 2028 (~34 animal units) as infrastructure and stock numbers are restored.
+
+Assessor: What are the priority resource concerns and constraints?
+Farmer: The biggest is manure handling. We do not currently have adequate cleanable feeding/confinement spaces or waste storage, so manure accumulates in feeding areas, mixes with soil and wasted feed, and is often piled on bare ground. Some facilities have unpaved floors, making cleanout difficult. This contributes to compaction and inefficiency, especially near the Peace Tunnel area. Field-level soil constraints include low pH across many fields and elevated P in the high tunnels. We also operate in the Oyster River watershed (impaired waters) and over aquifer/shallow soils in places, so we need to be conservative with N and control runoff.
+
+Assessor: How do you currently manage nutrients and soil amendments?
+Farmer: Fertility is primarily from composted manures. We compost mixed manures and apply compost to cropland. We also use wood ash as a liming material and potassium source, and we plan to keep adjusting pH based on soil tests. The CNMP indicates manure/compost provides only part of whole-farm N-P-K needs, but field-specific management is still important—especially in tunnels where P is already high.
+
+Assessor: Let’s talk grazing targets.
+Farmer: We aim to graze from early May into late fall/early winter using stockpiled forage. The grazing plan emphasizes prescribed grazing with temporary paddocks sized for short durations—no more than about four days of forage per paddock—so we maintain residual, encourage regrowth, and keep rest periods adequate. Some hay fields are integrated into the grazing system, and about five acres per year are rotated into heritage dent corn, temporarily reducing grazeable acreage.
+
+Assessor: What does the plan recommend for infrastructure over the next few years?
+Farmer: On the grazing side (2026), the plan calls for permanent woven-wire fencing (~8,500 ft) around key field blocks to improve control, plus brush management (~14.7 acres) and trails (~1,400 ft) to reduce compaction and mud. Also lime/wood-ash applications based on soil tests in multiple fields. On the nutrient management side (planned 2027), the CNMP recommends building heavy use areas for feeding, waste storage facilities sized for winter manure, and an additional composting pad to handle about one third of feedstocks volume beyond the existing roofed compost facility. Associated practices include access roads, a buried livestock pipeline (~700 ft), and frost-free drinkers to support group separation and winter access.
+
+Assessor: How will you monitor progress and keep records?
+Farmer: We will keep movement logs (paddock, group/herd, date, duration), use pasture stick readings, and track hay feeding (bales/day and total). For soil and nutrients, we’ll keep compost production logs, soil tests on a regular cycle, and detailed application records for compost and wood ash/lime. We’ll track animal performance through periodic weights or body condition and document health checks and parasite management decisions.</textarea>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+<button class="btn btn-primary" onclick="extractFromTranscript()">Extract to Import</button>
+<button class="btn btn-secondary" onclick="loadExampleTranscript()">Load Example</button>
+<button class="btn btn-danger" onclick="resetImportForm()">Reset All</button>
+</div>
+</div>
+</div>
+<!-- Import fields -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">2. Review &amp; Edit</span>
+</div>
+<div class="card-body">
+<!-- Farm Profile -->
+<div class="collapsible-header" onclick="toggleSection('farm-profile')">
+<span>📋 Farm Profile</span>
+<span class="chevron" id="chevron-farm-profile">▼</span>
+</div>
+<div class="collapsible-content open" id="section-farm-profile">
+<div class="grid-2">
+<div>
+<label>Enterprise Type</label>
+<input id="import-enterprise" placeholder="Beef, sheep, mixed..." type="text" value="Certified organic, diversified farm in Lee, New Hampshire (Cox family). Enterprises include: direct-marketed sheep, cattle, and chickens (meat); tenant-run cattle and poultry integrated with farm operations; grain corn (heritage dent varieties), mixed vegetables (including high tunnels), highbush blueberries, hay production/sales, composting &amp; land application of manures, and a horse boarding enterprise (currently 3 horses; planned expansion). The farm imports ~80 cubic yards of bedded horse manure annually; dog kennel is separate and excluded from nutrient plan."/>
+</div>
+<div>
+<label>Season of Use</label>
+<input id="import-season" placeholder="Year-round, May–Nov..." type="text" value="Year-round; grazing season May–Dec with stockpiled forage into late fall; winter feeding Dec–Apr (weather dependent)."/>
+</div>
+</div>
+<label>Goals / Objectives</label>
+<textarea id="import-goals" placeholder="One per line:
+Reduce hay feeding by 30 days
+Improve creek bank stability
+Simplify moves">Rebuild post-fire livestock infrastructure and scale animal numbers back to normal levels by 2028 (CNMP current→future scenarios).
+Improve manure handling: construct Heavy Use Areas + Waste Storage Facilities to prevent runoff and make manure collection feasible.
+Expand compost capacity (new composting pad) and standardize composting to produce stable material for cropland fertility.
+Implement prescribed grazing with smaller temporary paddocks (≤4 days graze per paddock) to improve utilization and pasture resilience.
+Extend grazing season through stockpiling; reduce hay feeding days and align winter feeding budgets with herd size.
+Maintain/strengthen soil health via regular compost additions (Soil Carbon Amendment) and pH management (wood ash / lime).
+Correct low soil pH in priority fields and manage phosphorus carefully in high tunnels with elevated soil test P.
+Protect water quality in the Oyster River impaired watershed and safeguard groundwater over aquifers/shallow soils using conservative N management and BMPs.
+Reduce compaction in high-impact zones (production areas, tunnel access, High Power pasture) with trails/roads, timing, and (if needed) mechanical treatment.
+Improve operational efficiency and recordkeeping (grazing, compost, nutrient applications) for organic compliance and NRCS practice support.</textarea>
+<label>Resource Concerns</label>
+<textarea id="import-concerns" placeholder="Water quality, erosion, weeds...">Inadequate waste storage and difficulty collecting manure from unpaved confinement/feeding areas; bare-ground stockpiles (CNMP).
+Compaction and manure accumulation in/near Peace Tunnel production area; hard to clean out and affects subsequent crops (CNMP).
+High soil test phosphorus in three high tunnels; requires P-aware nutrient management (CNMP).
+Low soil pH in multiple fields (14 of 33) limiting productivity; needs lime/wood ash applications (CNMP/SHMP).
+Farm located in Oyster River watershed with Category 5 impaired waterway; need strong nutrient/runoff safeguards (CNMP).
+Portions of land base over sand/gravel aquifer; shallow soils/high water table increase leaching risk—requires conservative N rates/BMPs (CNMP).
+Seasonal mud and feeding impacts in livestock concentration areas; need HUAs, aprons, and access roads (CNMP).
+Need frost-free, reliable livestock water distribution for planned infrastructure and group separation (CNMP).
+Pasture compaction noted in High Power Pasture SHMU; consider mechanical treatment and traffic management (SHMP).</textarea>
+</div>
+<!-- Herds & Groups -->
+<div class="collapsible-header" onclick="toggleSection('herds')">
+<span>🐄 Herds &amp; Groups</span>
+<span class="chevron" id="chevron-herds">▼</span>
+</div>
+<div class="collapsible-content open" id="section-herds">
+<label>Herds (one per line: name)</label>
+<textarea id="import-herds" placeholder="Cow Herd
+Replacement Heifers
+Sheep Flock">Sheep
+Cattle
+Horses
+Poultry</textarea>
+<label>Groups (CSV: name, herd, count, avg_weight)</label>
+<textarea id="import-groups" placeholder="Cows, Cow Herd, 42, 1250
+Calves, Cow Herd, 38, 450
+Ewes, Sheep Flock, 65, 145">Ewes, Sheep, 35, 130
+Ewe Lambs, Sheep, 20, 75
+Rams, Sheep, 22, 75
+Brood Cows, Cattle, 3, 1000
+Feeder Cattle, Cattle, 3, 500
+Horses, Horses, 3, 900
+Broiler Chicks (batch), Poultry, 80, 1
+Pasture Broilers (batch), Poultry, 80, 4</textarea>
+</div>
+<!-- Paddocks -->
+<div class="collapsible-header" onclick="toggleSection('paddocks')">
+<span>🗺️ Paddocks</span>
+<span class="chevron" id="chevron-paddocks">▼</span>
+</div>
+<div class="collapsible-content open" id="section-paddocks">
+<label>Paddocks (CSV: name, acres, type, notes)</label>
+<textarea id="import-paddocks" placeholder="North-5, 6.2, graze, gate area bare soil
+South-3, 4.1, graze, compaction near trough
+Creek-2, 3.0, silvopasture, riparian buffer
+Hay Field, 12, hay, not grazed">Gibby Border, 8.1, graze_hay, Tract 149; Soil HcC; Drainage Well drained; Aspect E; Slope 6.0%; pH 6.1; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Gibby Plot North, 0.1, graze_hay, Tract 149; Soil HcC; Drainage Well drained; Aspect E; Slope 2.0%; pH 6.2; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Gibby Plot West, 1.0, graze_hay, Tract 149; Soil BzB; Drainage Moderately well drained; Aspect E; Slope 3.0%; pH 5.9; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Gibby Plot East, 0.6, graze_hay, Tract 149; Soil BzB; Drainage Moderately well drained; Aspect E; Slope 3.0%; pH 6.0; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Sheltering Plot, 0.6, graze_hay, Tract 149; Soil ScA; Drainage Poorly drained; Aspect W; Slope 2.0%; pH 5.9; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Sheltering Border, 2.3, graze_hay, Tract 149; Soil BzB; Drainage Moderately well drained; Aspect W; Slope 7.0%; pH 6.0; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Kidder Plot, 3.2, graze_hay, Tract 149; Soil HcB; Drainage Well drained; Aspect SE; Slope 3.0%; pH 6.4; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Lang, 1.9, graze_hay, Tract 149; Soil HcB; Drainage Well drained; Aspect W; Slope 2.0%; pH 6.7; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Pond, 6.1, graze_hay, Tract 262; Soil HfC; Drainage Well drained; Aspect N; Slope 9.0%; pH 6.1; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Event, 3.2, graze_hay, Tract 262; Soil HfB; Drainage Well drained; Aspect N; Slope 3.0%; pH 6.1; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+High Power, 4.8, graze, Tract 262; Soil HdC; Drainage Well drained; Aspect Mixed; Slope 6.0%; pH 5.8; Forage prod 2.0 DM t/ac/yr; Mgmt Graze.
+Middle Power, 2.3, graze, Tract 262; Soil HdC; Drainage Well drained; Aspect E; Slope 8.0%; pH 6.3; Forage prod 2.0 DM t/ac/yr; Mgmt Graze.
+Old Orchard, 2.7, graze, Tract 262; Soil HdC; Drainage Well drained; Aspect SE; Slope 5.0%; pH 6.2; Forage prod 2.0 DM t/ac/yr; Mgmt Graze.
+Parking, 2.7, graze, Tract 511; Soil HdC; Drainage Well drained; Aspect E; Slope 7.0%; pH 5.5; Forage prod 2.0 DM t/ac/yr; Mgmt Graze.
+Emerson Plot 1, 2.2, graze_hay, Tract 511; Soil ScA; Drainage Poorly drained; Aspect Mixed; Slope 2.0%; pH 5.9; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Emerson Plot 2, 2.2, graze_hay, Tract 511; Soil BzB; Drainage Moderately well drained; Aspect E; Slope 4.0%; pH 5.9; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Emerson Border, 2.1, graze_hay, Tract 511; Soil BzB; Drainage Moderately well drained; Aspect E; Slope 8.0%; pH 5.8; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Dog Leg, 2.4, graze_hay, Tract 511; Soil SfE; Drainage Well drained; Aspect E; Slope 15.0%; pH 5.9; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+East Powerline, 2.2, graze, Tract 511; Soil HcD; Drainage Well drained; Aspect Mixed; Slope 10.0%; pH 5.4; Forage prod 2.0 DM t/ac/yr; Mgmt Graze.
+Hawk NW, 2.0, graze_hay, Tract 262; Soil HfB; Drainage Well drained; Aspect Mixed; Slope 3.0%; pH 6.3; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Hawk SW, 1.9, graze_hay, Tract 262; Soil HfC; Drainage Well drained; Aspect SE; Slope 9.0%; pH 6.4; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Hawk NE, 2.7, graze_hay, Tract 262; Soil HfB; Drainage Well drained; Aspect E; Slope 3.0%; pH 6.0; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Hawk SE, 1.1, graze_hay, Tract 262; Soil HfB; Drainage Well drained; Aspect E; Slope 3.0%; pH 6.1; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+Hawk Slope, 1.9, graze_hay, Tract 262; Soil HfC; Drainage Well drained; Aspect SE; Slope 7.0%; pH 6.4; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+James Plot, 2.5, graze_hay, Tract 262; Soil HfC; Drainage Well drained; Aspect SE; Slope 5.0%; pH 6.3; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.
+James Pasture, 3.9, graze_hay, Tract 262; Soil HfC; Drainage Well drained; Aspect SE; Slope 8.0%; pH 6.1; Forage prod 3.5 DM t/ac/yr; Mgmt Graze and Hay.</textarea>
+</div>
+<!-- Water & Fence -->
+<div class="collapsible-header" onclick="toggleSection('infrastructure')">
+<span>💧 Water &amp; Fence</span>
+<span class="chevron" id="chevron-infrastructure">▼</span>
+</div>
+<div class="collapsible-content open" id="section-infrastructure">
+<label>Water Sources (CSV: name, type, paddocks, capacity, notes)</label>
+<textarea id="import-water" placeholder="Barn Hydrant, hydrant, North-5;South-3, , frost-free
+Creek Crossing, stream, Creek-2, , seasonal
+Portable Tank, tank, , 100gal, moves with herd">Gibby Pond, pond, Gibby Border;Gibby Plot North;Gibby Plot West;Gibby Plot East, , Existing surface water source (mapped in app as 'Gibby Pond').
+Stream Crossing, stream, Hawk NW;Hawk SW;Hawk Valley, , Seasonal surface water access/stream crossing (monitor bank stability).
+Hawk Tank, tank, Hawk NW;Hawk SW;Hawk NE;Hawk SE;Hawk Slope, 500 gal, Tank-based distribution for Hawk complex; can be supplemented with portable troughs.
+James Tank, tank, James Plot;James Pasture, 300 gal, Tank-based distribution for James fields.
+Portable Trough, tank, (moveable), 100 gal, Portable trough for flexible subdivisions; keep move history (who/when/where).
+Livestock Pipeline (planned), pipeline, Sheep/Cattle HUA;Horse HUA;Composting Facility, , ~700 ft of 1" buried waterline to extend existing system (CNMP planned 2027).
+Frost-free Drinkers (planned), frostfree, Sheep/Cattle HUA;Horse HUA, , Install frost-free waterers to support group separation and winter access (CNMP planned 2027).</textarea>
+<label>Fence Summary</label>
+<textarea id="import-fence" placeholder="Perimeter: woven wire + 2 hot wires, good condition
+Subdivision: polywire with step-in posts, 4 reels
+Energizer: Gallagher M300 at barn">Existing/typical system:
+- Permanent perimeter fencing plus interior permanent divisions where already installed; temporary polywire/polybraid for daily/short-duration strips.
+- Use temporary paddocks sized for ≤4 days of forage per paddock (GMP), adjusting for pasture height/density and class of livestock.
+
+Planned/NRCS-driven improvements (GMP Record of Decisions, 2026):
+- Install ~8,500 ft of permanent woven-wire perimeter fence around the Gibby, Sheltering, Emerson, and East Powerline fields to enable better control and exclusion where needed.
+- Brush Management on ~14.7 acres to reclaim/maintain pasture edges and increase effective grazeable area.
+- Trails and Walkways: ~1,400 ft of stabilized trails to reduce compaction and mud during moves and winter feeding access.
+- Gates/lanes: standardize gate locations to reduce labor per move and make back-fencing practical.
+
+Future farmstead infrastructure (CNMP, 2027):
+- Design feeding areas to tie into Heavy Use Areas and adjacent manure storage so fencing supports confinement flow and manure collection.</textarea>
+</div>
+<!-- Seed Moves -->
+<div class="collapsible-header" onclick="toggleSection('moves')">
+<span>🔄 Seed Movement Logs</span>
+<span class="chevron" id="chevron-moves">▼</span>
+</div>
+<div class="collapsible-content open" id="section-moves">
+<label>Recent Moves (CSV: date, herd, from_paddock, to_paddock, days, notes)</label>
+<textarea id="import-moves" placeholder="2026-03-01, Cow Herd, North-5, South-3, 3, wet conditions
+2026-02-26, Cow Herd, Creek-2, North-5, 4, good recovery
+2026-02-22, Sheep Flock, South-3, Creek-2, 2, browsing"></textarea>
+</div>
+<!-- Economics -->
+<div class="collapsible-header" onclick="toggleSection('economics')">
+<span>💰 Economics</span>
+<span class="chevron" id="chevron-economics">▼</span>
+</div>
+<div class="collapsible-content open" id="section-economics">
+<div class="grid-3">
+<div>
+<label>Labor Rate ($/hr)</label>
+<input id="import-laborRate" step="0.5" type="number" value="22"/>
+</div>
+<div>
+<label>Overhead ($/day)</label>
+<input id="import-overheadPerDay" step="0.5" type="number" value="0"/>
+</div>
+<div>
+<label>Hay Cost ($/lb)</label>
+<input id="import-hayCostPerLb" step="0.01" type="number" value="0.06"/>
+</div>
+</div>
+<div class="grid-3">
+<div>
+<label>Mineral ($/AU/day)</label>
+<input id="import-mineralPerAUPerDay" step="0.01" type="number" value="0.35"/>
+</div>
+<div>
+<label>Fuel per Move ($)</label>
+<input id="import-fuelPerMove" step="0.5" type="number" value="8"/>
+</div>
+<div>
+<label>Vet ($/AU/year)</label>
+<input id="import-vetPerAU" step="1" type="number" value="15"/>
+</div>
+</div>
+</div>
+<!-- PCS Observations -->
+<div class="collapsible-header" onclick="toggleSection('observations')">
+<span>📝 Observations &amp; Notes</span>
+<span class="chevron" id="chevron-observations">▼</span>
+</div>
+<div class="collapsible-content open" id="section-observations">
+<label>PCS Notes (by paddock)</label>
+<textarea id="import-pcsNotes" placeholder="North-5: bare soil at gate (PCS indicator 2 = 2)
+South-3: compaction near trough (PCS indicator 4 = 2)
+Creek-2: bank sloughing (PCS indicator 10 = 2)">Overall soil health in cropland SHMUs tests/assessments are strong; no pervasive signs of degraded soil health were documented during the 2025 visit (SHMP).
+Exceptions / watchouts:
+- Compaction noted in specific high-impact zones (e.g., High Power Pasture SHMU, production-area/tunnel access points).
+- Use traffic management, trails, timing, and (if needed) mechanical treatment (Grazing Land Mechanical Treatment 548 considered in SHMP).</textarea>
+<label>Monitoring Plan</label>
+<textarea id="import-monitoring" placeholder="Photo points at each gate
+Residual target: 4 inches minimum
+Recovery target: 25-35 days by season
+Track rainfall vs. moves">Grazing monitoring &amp; records (GMP):
+- Use a pasture stick / sward height targets before &amp; after grazing; manage residual to protect regrowth and soil cover.
+- Track paddock rest periods and keep moves short (≤4 days per temporary paddock).
+- Document stockpile acreage and utilization; record hay feeding days and bale usage.
+- Note weather/soil conditions (avoid grazing or traffic when saturated); flag compaction areas.
+
+Nutrient / compost monitoring (CNMP/SHMP):
+- Annual compost production log: feedstocks, windrow dates, turns, temps, curing, finished volume.
+- Soil testing on a regular cycle (e.g., 1–3 yrs depending on field intensity); track pH and P especially in high tunnels.
+- Record wood ash / lime applications with rates, fields, and ECCE (when available); follow field-specific lime/wood-ash equivalence.
+- Maintain nutrient application records aligned to the CNMP nutrient management plan; use conservative N rates on aquifer/shallow soils.
+
+Animal performance &amp; compliance:
+- Periodic weights / body condition scoring; health checks aligned to season transitions.
+- Parasite management: targeted selective treatment, fecal egg counts as needed, pasture rest/stocking strategies; document deworming and withdrawal compliance.
+- Mineral plan: ensure access and document product/rate, especially during high demand periods (spring lactation, summer heat, fall stockpile).</textarea>
+</div>
+</div>
+</div>
+<!-- Gap Check -->
+<div class="card">
+<div class="card-header">
+<span class="card-title">3. Gap Check</span>
+<button class="btn btn-secondary btn-sm" onclick="runGapCheck()" style="padding:6px 10px;">Run Check</button>
+</div>
+<div class="card-body" id="gap-check-results">
+<p style="color:var(--muted);font-size:13px;">Click "Run Check" to validate required fields.</p>
+</div>
+</div>
+</div>
+<!-- Right column: payload preview -->
+<div>
+<div class="card" style="position:sticky;top:80px;">
+<div class="card-header">
+<span class="card-title">Import Payload Preview</span>
+</div>
+<div class="card-body">
+<button class="btn btn-primary" onclick="generatePayload()" style="width:100%;margin-bottom:12px;">Generate Payload</button>
+<div class="payload-preview" id="payload-preview">{
+  "schemaVersion": "grazing-intake-1.0",
+  "// Click Generate Payload": "to see import data"
+}</div>
+<div style="margin-top:12px;display:flex;gap:8px;">
+<button class="btn btn-secondary" onclick="copyPayload()" style="flex:1;">Copy JSON</button>
+<button class="btn btn-amber" onclick="downloadPayload()" style="flex:1;">Download</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- ============================================ -->
+<!-- PAGE: DATA SCHEMA -->
+<!-- ============================================ -->
+<section class="page" id="page-schema">
+<h2>Import Data Schema</h2>
+<p>JSON schema that maps directly to the Grazing Manager data model.</p>
+<div class="card">
+<div class="card-header"><span class="card-title">Schema Definition</span></div>
+<div class="card-body">
+<pre class="payload-preview" style="max-height:none;">{
+  "schemaVersion": "grazing-intake-1.0",
+  "timestamp": "2026-03-09T12:00:00Z",
+  "source": "talk-to-farm-intake",
+  
+  "session": {
+    "date": "2026-03-09",
+    "mode": "walk | zoom | phone",
+    "assessor": "string",
+    "duration_minutes": 60,
+    "transcript": "full transcript text..."
+  },
+  
+  "farm": {
+    "name": "string",
+    "location": {
+      "town": "string",
+      "county": "string", 
+      "state": "string",
+      "tract_ids": ["string"]
+    },
+    "enterprise": "beef | dairy | sheep | goat | mixed",
+    "season_of_use": "string",
+    "total_acres": 0
+  },
+  
+  "objectives": [
+    {
+      "text": "Reduce hay feeding by 30 days",
+      "category": "hay_reduction | pasture_improvement | water_quality | profit | drought_resilience | soil_health | animal_performance",
+      "target_metric": "30 days",
+      "priority": 1
+    }
+  ],
+  
+  "resource_concerns": [
+    {
+      "type": "soil | water | plants | animals | infrastructure",
+      "description": "string",
+      "severity": "low | medium | high"
+    }
+  ],
+  
+  "herds": [
+    {
+      "name": "Cow Herd",
+      "color": "#78350f",
+      "multiSpecies": false
+    }
+  ],
+  
+  "groups": [
+    {
+      "name": "Cows",
+      "herdName": "Cow Herd",
+      "type": "cattle_cow | cattle_calf | sheep_ewe | sheep_lamb | goat_doe | goat_kid",
+      "count": 42,
+      "avgWeight": 1250
+    }
+  ],
+  
+  "animals": [
+    {
+      "tag": "B-001",
+      "name": "Maple",
+      "species": "cattle | sheep | goat",
+      "breed": "string",
+      "sex": "female | male",
+      "weight": 1100,
+      "birthdate": "2020-04-10",
+      "status": "active",
+      "herdName": "Cow Herd",
+      "groupName": "Cows"
+    }
+  ],
+  
+  "paddocks": [
+    {
+      "name": "North-5",
+      "acres": 6.2,
+      "type": "graze | silvopasture | hay | sacrifice",
+      "notes": "gate area bare soil",
+      "coords": [[lng, lat], ...],  // Optional GeoJSON
+      "pcs_scores": {
+        "desirable_plants": 3,
+        "ground_cover": 2,
+        "erosion": 4,
+        "compaction": 3,
+        "manure_distribution": 4,
+        "undesirable_plants": 3,
+        "concentration_areas": 2,
+        "residual": 3,
+        "recovery": 4,
+        "riparian": 4
+      }
+    }
+  ],
+  
+  "waterSources": [
+    {
+      "name": "Barn Hydrant",
+      "type": "hydrant | tank | pond | stream | spring",
+      "paddocks": ["North-5", "South-3"],
+      "capacity": null,
+      "status": "active | seasonal | inactive",
+      "reliability": "high | medium | low",
+      "winter_issues": "string",
+      "coords": { "lat": 0, "lng": 0 }
+    }
+  ],
+  
+  "fence": {
+    "perimeter": {
+      "type": "string",
+      "condition": "good | fair | poor"
+    },
+    "subdivision": {
+      "method": "polywire | netting | permanent",
+      "equipment": ["4 reels", "step-in posts"]
+    },
+    "energizer": {
+      "model": "string",
+      "location": "string"
+    },
+    "bottlenecks": ["string"]
+  },
+  
+  "seedMovements": [
+    {
+      "date": "2026-03-01",
+      "herdName": "Cow Herd",
+      "fromPaddock": "North-5",
+      "toPaddock": "South-3",
+      "days": 3,
+      "notes": "wet conditions"
+    }
+  ],
+  
+  "economics": {
+    "laborRate": 22,
+    "overheadPerDay": 5,
+    "hayCostPerLb": 0.06,
+    "mineralPerAUPerDay": 0.35,
+    "fuelPerMove": 8,
+    "vetPerAU": 15
+  },
+  
+  "observations": [
+    {
+      "paddockName": "North-5",
+      "type": "pcs | forage | general",
+      "notes": "bare soil at gate",
+      "date": "2026-03-09"
+    }
+  ],
+  
+  "monitoringPlan": {
+    "photo_points": ["string"],
+    "residual_target": "4 inches",
+    "recovery_targets": {
+      "spring": "25 days",
+      "summer": "35 days",
+      "fall": "45 days",
+      "winter": "60 days"
+    },
+    "track_rainfall": true
+  },
+  
+  "actionItems": [
+    {
+      "text": "Fix water line freeze issue",
+      "category": "water | fence | health | infrastructure",
+      "priority": "high | medium | low",
+      "assignedTo": "string",
+      "dueDate": "2026-04-01"
+    }
+  ]
+}</pre>
+</div>
+</div>
+<div class="card">
+<div class="card-header"><span class="card-title">Field Mapping to Grazing Manager</span></div>
+<div class="card-body">
+<table style="width:100%;font-size:13px;border-collapse:collapse;">
+<thead>
+<tr style="background:rgba(101,163,13,0.1);">
+<th style="padding:10px;text-align:left;border-bottom:2px solid var(--grass);">Import Field</th>
+<th style="padding:10px;text-align:left;border-bottom:2px solid var(--grass);">Grazing Manager State</th>
+<th style="padding:10px;text-align:left;border-bottom:2px solid var(--grass);">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">herds[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.herds[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Generate IDs, assign colors</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">groups[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.groups[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Link to herd by name→ID</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">animals[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.animals[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Optional individual tracking</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">paddocks[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.paddocks[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Assign colors, calc area if coords</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">waterSources[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.waterSources[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Map coords, set status</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">seedMovements[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.grazingEvents[] + movementLogs[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Generate both for timeline</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">economics{}</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.economics{}</td><td style="padding:8px;border-bottom:1px solid var(--line);">Direct mapping</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">observations[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.observations[]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Link paddock by name→ID</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid var(--line);">pcs_scores{}</td><td style="padding:8px;border-bottom:1px solid var(--line);">state.soilHealth[paddockId]</td><td style="padding:8px;border-bottom:1px solid var(--line);">Merge with soil data</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</main>
+<script>
+// =============================================
+// NAVIGATION
+// =============================================
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('page-' + tab.dataset.page).classList.add('active');
+  });
+});
+
+// =============================================
+// COLLAPSIBLE SECTIONS
+// =============================================
+function toggleSection(id) {
+  const section = document.getElementById('section-' + id);
+  const chevron = document.getElementById('chevron-' + id);
+  section.classList.toggle('open');
+  chevron.classList.toggle('open');
+}
+
+// =============================================
+// PCS SCORING
+// =============================================
+let pcsObservations = [];
+
+function savePCSScore() {
+  const paddock = document.getElementById('pcs-paddock').value;
+  if (!paddock) { alert('Select a paddock first'); return; }
+  
+  const scores = {};
+  for (let i = 1; i <= 10; i++) {
+    const checked = document.querySelector(`input[name="pcs${i}"]:checked`);
+    scores[i] = checked ? parseInt(checked.value) : null;
+  }
+  
+  const obs = {
+    paddock: paddock,
+    scores: scores,
+    notes: document.getElementById('pcs-notes').value,
+    date: new Date().toISOString()
+  };
+  
+  pcsObservations.push(obs);
+  renderPCSList();
+  clearPCSForm();
+  alert('PCS score saved for ' + paddock);
+}
+
+function clearPCSForm() {
+  document.querySelectorAll('.pcs-grid input[type="radio"]').forEach(r => r.checked = false);
+  document.getElementById('pcs-notes').value = '';
+}
+
+function renderPCSList() {
+  const el = document.getElementById('pcs-saved-list');
+  if (pcsObservations.length === 0) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:13px;">No observations saved yet.</p>';
+    return;
+  }
+  
+  el.innerHTML = pcsObservations.map((obs, idx) => {
+    const avgScore = Object.values(obs.scores).filter(v => v !== null).reduce((a, b) => a + b, 0) / 
+                     Object.values(obs.scores).filter(v => v !== null).length;
+    return `<div style="padding:10px;background:#fff;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>${obs.paddock}</strong>
+        <span style="background:${avgScore >= 4 ? 'var(--grass)' : avgScore >= 3 ? 'var(--amber)' : 'var(--danger)'};color:white;padding:2px 8px;border-radius:4px;font-size:11px;">Avg: ${avgScore.toFixed(1)}</span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin:6px 0 0;">${obs.notes || 'No notes'}</p>
+    </div>`;
+  }).join('');
+}
+
+// =============================================
+// IMPORT FORM
+// =============================================
+function loadExampleTranscript() {
+  document.getElementById('import-farmName').value = 'Maple Ridge Grazing';
+  document.getElementById('import-assessor').value = 'Conservation District – Grazing Specialist';
+  document.getElementById('import-date').value = '2026-03-09';
+  document.getElementById('import-mode').value = 'zoom';
+  
+  document.getElementById('import-transcript').value = `Assessor: Is it okay if I record this session?
+Farmer: Yes, that's fine.
+
+Assessor: What's the single most important outcome from today?
+Farmer: GOAL: Cut hay feeding by at least 30 days this year.
+
+Assessor: Any non-negotiables?
+Farmer: CONCERN: We have to protect the creek bank - there's already some erosion. And I only have about 45 minutes a day for grazing management.
+
+Assessor: Tell me about your operation.
+Farmer: We're in Bristol County, Massachusetts. About 120 acres total, maybe 80 grazeable. Mix of beef cattle and sheep - we call it a "flerd" sometimes.
+
+Assessor: Livestock classes and headcounts?
+Farmer: HERD: Cow Herd - 42 cows with calves, Angus cross, cows average 1250 lbs.
+GROUP: Cows, Cow Herd, 42, 1250
+GROUP: Calves, Cow Herd, 38, 450
+HERD: Sheep Flock - 65 ewes, 90 lambs right now, Katahdin.
+GROUP: Ewes, Sheep Flock, 65, 145
+GROUP: Lambs, Sheep Flock, 90, 75
+We also have 2 guardian dogs that move with the sheep.
+
+Assessor: Paddocks and acres?
+Farmer: PADDOCK: North-5, 6.2 acres - this is our main rotation start
+PADDOCK: South-3, 4.1 acres - good recovery usually
+PADDOCK: Creek-2, 3.0 acres - silvopasture along the creek, need to be careful here
+PADDOCK: Hay Field, 12 acres - we cut this, don't graze it
+PADDOCK: Back-40, 8.5 acres - furthest from barn, water is tricky
+PADDOCK: Sacrifice, 2 acres - where they go in really wet weather
+
+Assessor: Water system?
+Farmer: WATER: Barn Hydrant, hydrant, North-5;South-3, frost-free, reliable
+WATER: Creek Crossing, stream, Creek-2, seasonal only March through November
+WATER: Portable Tank, tank, 100gal capacity, moves with the main herd
+The back paddock water line froze twice last winter - that's a problem area.
+CONCERN: Water line to Back-40 freezes in winter.
+
+Assessor: Fence setup?
+Farmer: Perimeter is woven wire with 2 hot wires on top, good condition.
+We subdivide with polywire - have 4 reels and maybe 100 step-in posts.
+Energizer is a Gallagher M300 at the barn.
+Biggest issue is the polywire tangles and the reels are getting old.
+ACTION: Need to replace 2 polywire reels before next season.
+
+Assessor: What triggers a move?
+Farmer: We try to move every 2-3 days. I watch the grass height - want to leave at least 4 inches residual.
+Rest period target is 25-35 days depending on rain.
+
+Assessor: Tell me about your last 3 moves.
+Farmer: MOVE: 2026-03-01, Cow Herd, North-5, South-3, 3, moved early because of wet conditions
+MOVE: 2026-02-26, Cow Herd, Creek-2, North-5, 4, good recovery
+MOVE: 2026-02-22, Sheep Flock, South-3, Creek-2, 2, browsing the multiflora rose
+
+Assessor: Any bare soil, compaction, erosion issues?
+Farmer: PCS: North-5, bare soil at the gate - indicator 2 score 2
+PCS: South-3, some compaction near the trough - indicator 4 score 2  
+PCS: Creek-2, bank sloughing in one spot - indicator 10 score 2
+The sheep help with the weeds but we still have multiflora rose and autumn olive spreading.
+
+Assessor: Labor rate for planning?
+Farmer: ECON: laborRate=25, that's what I figure my time is worth
+Hay runs about $60/round bale, maybe 800 lbs each.
+ECON: hayCost=0.075
+
+Assessor: What would success look like?
+Farmer: GOAL: Get to 200+ days on pasture instead of 170 last year
+GOAL: Stop the creek bank erosion
+GOAL: Move the cows in under 30 minutes including water setup`;
+
+  extractFromTranscript();
+}
+
+function resetImportForm() {
+  const fields = ['farmName', 'assessor', 'date', 'transcript', 'enterprise', 'season', 
+                  'goals', 'concerns', 'herds', 'groups', 'paddocks', 'water', 'fence', 
+                  'moves', 'pcsNotes', 'monitoring'];
+  fields.forEach(f => {
+    const el = document.getElementById('import-' + f);
+    if (el) el.value = '';
+  });
+  document.getElementById('payload-preview').textContent = '{\n  "// Reset": "form cleared"\n}';
+  document.getElementById('gap-check-results').innerHTML = '<p style="color:var(--muted);font-size:13px;">Click "Run Check" to validate.</p>';
+}
+
+function extractFromTranscript() {
+  const transcript = document.getElementById('import-transcript').value;
+  if (!transcript) { alert('Paste a transcript first'); return; }
+  
+  // Extract GOAL: tags
+  const goals = [];
+  const goalMatches = transcript.match(/GOAL:\s*([^\n.]+)/gi);
+  if (goalMatches) {
+    goalMatches.forEach(m => goals.push(m.replace(/GOAL:\s*/i, '').trim()));
+  }
+  if (goals.length) document.getElementById('import-goals').value = goals.join('\n');
+  
+  // Extract CONCERN: tags
+  const concerns = [];
+  const concernMatches = transcript.match(/CONCERN:\s*([^\n.]+)/gi);
+  if (concernMatches) {
+    concernMatches.forEach(m => concerns.push(m.replace(/CONCERN:\s*/i, '').trim()));
+  }
+  if (concerns.length) document.getElementById('import-concerns').value = concerns.join('\n');
+  
+  // Extract HERD: tags
+  const herds = [];
+  const herdMatches = transcript.match(/HERD:\s*([^\n-]+)/gi);
+  if (herdMatches) {
+    herdMatches.forEach(m => {
+      const name = m.replace(/HERD:\s*/i, '').split(/[-–]/)[0].trim();
+      if (name && !herds.includes(name)) herds.push(name);
+    });
+  }
+  if (herds.length) document.getElementById('import-herds').value = herds.join('\n');
+  
+  // Extract GROUP: tags
+  const groups = [];
+  const groupMatches = transcript.match(/GROUP:\s*([^\n]+)/gi);
+  if (groupMatches) {
+    groupMatches.forEach(m => {
+      const parts = m.replace(/GROUP:\s*/i, '').trim();
+      groups.push(parts);
+    });
+  }
+  if (groups.length) document.getElementById('import-groups').value = groups.join('\n');
+  
+  // Extract PADDOCK: tags
+  const paddocks = [];
+  const paddockMatches = transcript.match(/PADDOCK:\s*([^\n]+)/gi);
+  if (paddockMatches) {
+    paddockMatches.forEach(m => {
+      const parts = m.replace(/PADDOCK:\s*/i, '').trim();
+      paddocks.push(parts);
+    });
+  }
+  if (paddocks.length) document.getElementById('import-paddocks').value = paddocks.join('\n');
+  
+  // Extract WATER: tags
+  const water = [];
+  const waterMatches = transcript.match(/WATER:\s*([^\n]+)/gi);
+  if (waterMatches) {
+    waterMatches.forEach(m => {
+      water.push(m.replace(/WATER:\s*/i, '').trim());
+    });
+  }
+  if (water.length) document.getElementById('import-water').value = water.join('\n');
+  
+  // Extract MOVE: tags
+  const moves = [];
+  const moveMatches = transcript.match(/MOVE:\s*([^\n]+)/gi);
+  if (moveMatches) {
+    moveMatches.forEach(m => {
+      moves.push(m.replace(/MOVE:\s*/i, '').trim());
+    });
+  }
+  if (moves.length) document.getElementById('import-moves').value = moves.join('\n');
+  
+  // Extract PCS: tags
+  const pcs = [];
+  const pcsMatches = transcript.match(/PCS:\s*([^\n]+)/gi);
+  if (pcsMatches) {
+    pcsMatches.forEach(m => {
+      pcs.push(m.replace(/PCS:\s*/i, '').trim());
+    });
+  }
+  if (pcs.length) document.getElementById('import-pcsNotes').value = pcs.join('\n');
+  
+  // Extract ECON: tags
+  const econMatches = transcript.match(/ECON:\s*(\w+)=([^\s,]+)/gi);
+  if (econMatches) {
+    econMatches.forEach(m => {
+      const match = m.match(/ECON:\s*(\w+)=([^\s,]+)/i);
+      if (match) {
+        const field = match[1].toLowerCase();
+        const value = match[2];
+        const el = document.getElementById('import-' + field);
+        if (el) el.value = value;
+      }
+    });
+  }
+  
+  // Extract ACTION: tags
+  const actionMatches = transcript.match(/ACTION:\s*([^\n.]+)/gi);
+  // Could populate a separate action items field
+  
+  // Try to infer enterprise from content
+  const lower = transcript.toLowerCase();
+  if (lower.includes('beef') && lower.includes('sheep')) {
+    document.getElementById('import-enterprise').value = 'Mixed beef/sheep';
+  } else if (lower.includes('beef') || lower.includes('cattle') || lower.includes('cow')) {
+    document.getElementById('import-enterprise').value = 'Beef cattle';
+  } else if (lower.includes('sheep') || lower.includes('ewe') || lower.includes('lamb')) {
+    document.getElementById('import-enterprise').value = 'Sheep';
+  }
+  
+  runGapCheck();
+  generatePayload();
+}
+
+function runGapCheck() {
+  const gaps = [];
+  
+  if (!document.getElementById('import-farmName').value.trim()) {
+    gaps.push({ text: 'Missing farm name', resolved: false });
+  }
+  
+  if (!document.getElementById('import-herds').value.trim()) {
+    gaps.push({ text: 'No herds entered — need at least one management unit', resolved: false });
+  }
+  
+  if (!document.getElementById('import-paddocks').value.trim()) {
+    gaps.push({ text: 'No paddocks entered — need names and acres', resolved: false });
+  }
+  
+  if (!document.getElementById('import-goals').value.trim()) {
+    gaps.push({ text: 'Goals/objectives missing — ask: "What are your top 3 objectives?"', resolved: false });
+  }
+  
+  if (!document.getElementById('import-water').value.trim()) {
+    gaps.push({ text: 'Water system not documented — ask: "Where do animals drink?"', resolved: false });
+  }
+  
+  if (!document.getElementById('import-moves').value.trim()) {
+    gaps.push({ text: 'No seed movements — ask: "Tell me about your last 3 moves"', resolved: false });
+  }
+  
+  if (!document.getElementById('import-groups').value.trim()) {
+    gaps.push({ text: 'No group details — need headcounts and weights for AU calculations', resolved: false });
+  }
+  
+  const el = document.getElementById('gap-check-results');
+  if (gaps.length === 0) {
+    el.innerHTML = '<div class="gap-item resolved"><span class="gap-icon">✅</span> No major gaps detected. Ready for import.</div>';
+  } else {
+    el.innerHTML = gaps.map(g => 
+      `<div class="gap-item"><span class="gap-icon">⚠️</span> ${g.text}</div>`
+    ).join('');
+  }
+}
+
+function parseCSVLines(text) {
+  return text.split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+    .map(l => l.split(',').map(x => x.trim()));
+}
+
+function generatePayload() {
+  const payload = {
+    schemaVersion: "grazing-intake-1.0",
+    timestamp: new Date().toISOString(),
+    source: "talk-to-farm-intake",
+    
+    session: {
+      date: document.getElementById('import-date').value,
+      mode: document.getElementById('import-mode').value,
+      assessor: document.getElementById('import-assessor').value,
+      transcript: document.getElementById('import-transcript').value
+    },
+    
+    farm: {
+      name: document.getElementById('import-farmName').value,
+      enterprise: document.getElementById('import-enterprise').value,
+      seasonOfUse: document.getElementById('import-season').value
+    },
+    
+    objectives: document.getElementById('import-goals').value.split('\n').filter(Boolean).map((g, i) => ({
+      text: g.trim(),
+      priority: i + 1
+    })),
+    
+    resourceConcerns: document.getElementById('import-concerns').value.split('\n').filter(Boolean).map(c => ({
+      description: c.trim()
+    })),
+    
+    herds: document.getElementById('import-herds').value.split('\n').filter(Boolean).map(h => ({
+      name: h.trim(),
+      color: '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')
+    })),
+    
+    groups: parseCSVLines(document.getElementById('import-groups').value).map(cols => ({
+      name: cols[0] || '',
+      herdName: cols[1] || '',
+      count: parseInt(cols[2]) || 0,
+      avgWeight: parseInt(cols[3]) || 0
+    })),
+    
+    paddocks: parseCSVLines(document.getElementById('import-paddocks').value).map(cols => ({
+      name: cols[0] || '',
+      acres: parseFloat(cols[1]) || 0,
+      type: cols[2] || 'graze',
+      notes: cols.slice(3).join(', ')
+    })),
+    
+    waterSources: parseCSVLines(document.getElementById('import-water').value).map(cols => ({
+      name: cols[0] || '',
+      type: cols[1] || 'tank',
+      paddocks: (cols[2] || '').split(';').map(p => p.trim()).filter(Boolean),
+      capacity: cols[3] || null,
+      notes: cols.slice(4).join(', ')
+    })),
+    
+    fenceSummary: document.getElementById('import-fence').value,
+    
+    seedMovements: parseCSVLines(document.getElementById('import-moves').value).map(cols => ({
+      date: cols[0] || '',
+      herdName: cols[1] || '',
+      fromPaddock: cols[2] || '',
+      toPaddock: cols[3] || '',
+      days: parseInt(cols[4]) || 3,
+      notes: cols.slice(5).join(', ')
+    })),
+    
+    economics: {
+      laborRate: parseFloat(document.getElementById('import-laborRate').value) || 22,
+      overheadPerDay: parseFloat(document.getElementById('import-overheadPerDay').value) || 5,
+      hayCostPerLb: parseFloat(document.getElementById('import-hayCostPerLb').value) || 0.06,
+      mineralPerAUPerDay: parseFloat(document.getElementById('import-mineralPerAUPerDay').value) || 0.35,
+      fuelPerMove: parseFloat(document.getElementById('import-fuelPerMove').value) || 8,
+      vetPerAU: parseFloat(document.getElementById('import-vetPerAU').value) || 15
+    },
+    
+    observations: document.getElementById('import-pcsNotes').value.split('\n').filter(Boolean).map(o => ({
+      notes: o.trim(),
+      type: 'pcs',
+      date: new Date().toISOString().split('T')[0]
+    })),
+    
+    monitoringPlan: document.getElementById('import-monitoring').value
+  };
+  
+  document.getElementById('payload-preview').textContent = JSON.stringify(payload, null, 2);
+  window._importPayload = payload;
+  try{localStorage.setItem('farmhack_intake_payload', JSON.stringify(payload));}catch(e){}
+}
+
+function copyPayload() {
+  const text = document.getElementById('payload-preview').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Payload copied to clipboard');
+  });
+}
+
+function downloadPayload() {
+  const text = document.getElementById('payload-preview').textContent;
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `farm-intake-${document.getElementById('import-farmName').value.replace(/\s+/g, '-') || 'export'}-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Initialize
+if(!document.getElementById('import-date').value){document.getElementById('import-date').value = new Date().toISOString().split('T')[0];}
+</script>
+</body>
+</html>
