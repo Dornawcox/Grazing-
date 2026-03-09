@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2e0a">
+<title>Field Recorder v2</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+  --forest: #1a2e0a;
+  --forest-mid: #243d10;
+  --grass: #4d7c0f;
+  --grass-light: #65a30d;
+  --amber: #d97706;
+  --hay: #ca8a04;
+  --earth: #78350f;
+  --parchment: #faf5e4;
+  --card: #fffdf8;
+  --danger: #dc2626;
+  --water: #0ea5e9;
+  --muted: #6b7280;
+  --success: #16a34a;
+  --fence: #f97316;
+  --purple: #8b5cf6;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--forest); color: var(--parchment); touch-action: manipulation; }
+.app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+
+header { background: var(--forest); padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--grass); z-index: 1000; flex-shrink: 0; }
+.header-left { display: flex; align-items: center; gap: 8px; }
+.app-icon { width: 28px; height: 28px; background: var(--grass); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.app-icon svg { width: 14px; height: 14px; fill: var(--parchment); }
+.app-title { font-size: 14px; font-weight: 700; }
+.date-badge { background: var(--grass); color: white; padding: 2px 7px; border-radius: 8px; font-size: 9px; font-weight: 600; }
+.task-badge { background: var(--danger); color: white; padding: 2px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; margin-left: 6px; cursor: pointer; }
+.sync-status { display: flex; align-items: center; gap: 4px; font-size: 9px; color: var(--grass-light); cursor: pointer; padding: 4px 6px; border-radius: 5px; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+.sync-dot.pending { background: var(--amber); }
+.sync-dot.offline { background: var(--muted); }
+
+.mode-tabs { display: flex; background: var(--forest-mid); border-bottom: 1px solid rgba(101,163,13,0.3); flex-shrink: 0; }
+.mode-tab { flex: 1; padding: 7px 4px; text-align: center; font-size: 8px; font-weight: 600; text-transform: uppercase; color: rgba(250,245,228,0.5); background: transparent; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.mode-tab svg { width: 16px; height: 16px; fill: currentColor; }
+.mode-tab.active { color: var(--grass-light); background: rgba(101,163,13,0.15); border-bottom: 2px solid var(--grass-light); }
+
+.map-container { flex: 1; position: relative; min-height: 0; }
+#map { width: 100%; height: 100%; }
+
+.draw-banner { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); background: var(--fence); color: white; padding: 5px 12px; border-radius: 14px; font-size: 10px; font-weight: 600; z-index: 1000; display: none; box-shadow: 0 2px 6px rgba(0,0,0,0.3); align-items: center; gap: 5px; }
+.draw-banner.active { display: flex; }
+.draw-banner.paddock { background: var(--purple); }
+.draw-banner svg { width: 12px; height: 12px; fill: white; }
+
+.measure-box { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); background: var(--forest); color: var(--parchment); padding: 8px 14px; border-radius: 8px; z-index: 1000; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.4); border: 1px solid var(--grass); text-align: center; min-width: 120px; }
+.measure-box.active { display: block; }
+.measure-box .primary { font-size: 18px; font-weight: 700; color: var(--grass-light); }
+.measure-box .label { font-size: 8px; color: var(--muted); text-transform: uppercase; }
+.measure-box .secondary { font-size: 10px; color: var(--amber); margin-top: 2px; }
+
+.action-panel { background: var(--card); border-top: 3px solid var(--grass); padding: 8px 12px; flex-shrink: 0; max-height: 48vh; overflow-y: auto; }
+
+/* Common */
+.instruction-box { text-align: center; padding: 6px; background: rgba(101,163,13,0.1); border-radius: 6px; margin-bottom: 6px; color: var(--forest); }
+.instruction-box .step { font-size: 11px; font-weight: 600; color: var(--grass); }
+.instruction-box .hint { font-size: 9px; color: var(--muted); margin-top: 1px; }
+
+.btn-row { display: flex; gap: 5px; margin-bottom: 6px; }
+.btn { flex: 1; padding: 9px; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; }
+.btn svg { width: 12px; height: 12px; fill: currentColor; }
+.btn-confirm { background: var(--grass); color: white; }
+.btn-confirm:active { background: var(--grass-light); transform: scale(0.98); }
+.btn-cancel { background: var(--muted); color: white; }
+.btn-fence { background: var(--fence); color: white; }
+.btn-purple { background: var(--purple); color: white; }
+.btn-danger { background: var(--danger); color: white; }
+.btn-outline { background: white; border: 1px solid var(--muted); color: var(--forest); }
+.btn-water { background: var(--water); color: white; }
+.btn-sm { padding: 6px 10px; font-size: 10px; }
+
+/* Herd buttons */
+.herd-buttons { display: flex; gap: 5px; margin-bottom: 6px; }
+.herd-btn { flex: 1; padding: 8px 6px; border: 2px solid var(--muted); border-radius: 8px; background: white; font-size: 11px; font-weight: 600; color: var(--forest); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.herd-btn svg { width: 22px; height: 22px; fill: var(--earth); }
+.herd-btn.selected { border-color: var(--grass); background: rgba(101,163,13,0.1); }
+.herd-btn.selected svg { fill: var(--grass); }
+.herd-btn .count { font-size: 8px; color: var(--muted); }
+
+.move-summary { background: rgba(101,163,13,0.1); border: 2px solid var(--grass); border-radius: 8px; padding: 8px; margin-bottom: 6px; }
+.move-summary h4 { font-size: 9px; color: var(--muted); text-transform: uppercase; margin-bottom: 3px; }
+.move-detail { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--forest); }
+.move-arrow { color: var(--grass); font-weight: bold; }
+
+/* Draw tools */
+.draw-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 6px; }
+.draw-btn { padding: 8px 6px; border: 2px solid var(--muted); border-radius: 8px; background: white; font-size: 10px; font-weight: 600; color: var(--forest); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.draw-btn svg { width: 20px; height: 20px; fill: var(--muted); }
+.draw-btn.active-fence { border-color: var(--fence); background: rgba(249,115,22,0.1); }
+.draw-btn.active-fence svg { fill: var(--fence); }
+.draw-btn.active-paddock { border-color: var(--purple); background: rgba(139,92,246,0.1); }
+.draw-btn.active-paddock svg { fill: var(--purple); }
+
+.drawing-list { max-height: 100px; overflow-y: auto; }
+.drawing-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: white; border: 1px solid rgba(0,0,0,0.1); border-radius: 6px; margin-bottom: 4px; }
+.drawing-item.fence { border-left: 3px solid var(--fence); }
+.drawing-item.paddock { border-left: 3px solid var(--purple); }
+.drawing-info .name { font-size: 11px; font-weight: 600; color: var(--forest); }
+.drawing-info .stats { font-size: 10px; color: var(--fence); font-weight: 600; }
+.drawing-info .meta { font-size: 9px; color: var(--muted); }
+.drawing-actions { display: flex; gap: 3px; }
+.drawing-actions button { padding: 4px 6px; border: none; border-radius: 4px; font-size: 9px; cursor: pointer; }
+.btn-edit-sm { background: var(--water); color: white; }
+.btn-take-sm { background: var(--amber); color: white; }
+.btn-del-sm { background: var(--danger); color: white; }
+
+/* Observe tabs */
+.observe-tabs { display: flex; gap: 3px; margin-bottom: 6px; overflow-x: auto; }
+.obs-tab { padding: 6px 10px; border: 1px solid var(--muted); border-radius: 6px; background: white; font-size: 9px; font-weight: 600; color: var(--forest); cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 3px; }
+.obs-tab svg { width: 12px; height: 12px; fill: var(--muted); }
+.obs-tab.active { border-color: var(--water); background: rgba(14,165,233,0.1); color: var(--water); }
+.obs-tab.active svg { fill: var(--water); }
+
+.observe-form { background: white; border-radius: 6px; padding: 8px; border: 1px solid rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; }
+.observe-form label { display: block; font-size: 9px; font-weight: 600; color: var(--muted); margin-bottom: 2px; margin-top: 6px; }
+.observe-form label:first-child { margin-top: 0; }
+.observe-form input, .observe-form select, .observe-form textarea { width: 100%; padding: 6px 8px; border: 1px solid rgba(0,0,0,0.15); border-radius: 5px; font-size: 12px; }
+.observe-form textarea { min-height: 36px; resize: none; }
+.observe-form .help { font-size: 9px; color: var(--muted); margin-top: 2px; font-style: italic; }
+.observe-form .info-box { background: rgba(14,165,233,0.1); border: 1px solid var(--water); border-radius: 5px; padding: 6px; margin-top: 6px; font-size: 9px; color: var(--forest); }
+.observe-form .info-box b { color: var(--water); }
+.observe-form .warn-box { background: rgba(220,38,38,0.1); border: 1px solid var(--danger); border-radius: 5px; padding: 6px; margin-top: 6px; font-size: 9px; color: var(--danger); }
+
+/* Species selector */
+.species-row { display: flex; gap: 4px; margin-bottom: 6px; }
+.species-btn { flex: 1; padding: 6px 4px; border: 1px solid var(--muted); border-radius: 5px; background: white; font-size: 8px; font-weight: 600; color: var(--forest); cursor: pointer; text-align: center; }
+.species-btn.active { border-color: var(--grass); background: rgba(101,163,13,0.1); color: var(--grass); }
+
+/* Tasks */
+.task-list { max-height: 180px; overflow-y: auto; }
+.task-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px; background: white; border: 1px solid rgba(0,0,0,0.1); border-radius: 6px; margin-bottom: 4px; }
+.task-item.overdue { border-left: 3px solid var(--danger); background: rgba(220,38,38,0.05); }
+.task-item.today { border-left: 3px solid var(--amber); background: rgba(217,119,6,0.05); }
+.task-item.upcoming { border-left: 3px solid var(--water); }
+.task-check { width: 20px; height: 20px; border: 2px solid var(--muted); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.task-check:hover { border-color: var(--grass); }
+.task-check.done { background: var(--grass); border-color: var(--grass); }
+.task-check svg { width: 12px; height: 12px; fill: white; display: none; }
+.task-check.done svg { display: block; }
+.task-content { flex: 1; }
+.task-title { font-size: 11px; font-weight: 600; color: var(--forest); }
+.task-meta { font-size: 9px; color: var(--muted); margin-top: 1px; }
+.task-due { font-size: 9px; font-weight: 600; }
+.task-due.overdue { color: var(--danger); }
+.task-due.today { color: var(--amber); }
+
+.add-task-form { background: white; border-radius: 6px; padding: 8px; border: 1px solid rgba(0,0,0,0.1); margin-bottom: 6px; }
+.add-task-form input, .add-task-form select { width: 100%; padding: 6px 8px; border: 1px solid rgba(0,0,0,0.15); border-radius: 5px; font-size: 12px; margin-bottom: 4px; }
+
+/* Recent */
+.recent-bar { background: var(--forest-mid); padding: 6px 12px; flex-shrink: 0; }
+.recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.recent-header h4 { font-size: 8px; text-transform: uppercase; color: var(--grass-light); letter-spacing: 0.5px; }
+.pending-badge { font-size: 8px; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; }
+.recent-scroll { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.recent-item { flex-shrink: 0; background: rgba(255,255,255,0.1); border-radius: 5px; padding: 4px 8px; font-size: 9px; max-width: 140px; }
+.recent-item .time { color: var(--grass-light); font-size: 8px; }
+.recent-item .desc { color: var(--parchment); margin-top: 1px; }
+
+.voice-fab { position: absolute; bottom: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%; background: var(--grass); border: none; cursor: pointer; box-shadow: 0 3px 8px rgba(0,0,0,0.3); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.voice-fab svg { width: 20px; height: 20px; fill: white; }
+.voice-fab:active { transform: scale(0.95); }
+.voice-fab.recording { background: var(--danger); animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0.4);} 50%{box-shadow:0 0 0 8px rgba(220,38,38,0);} }
+
+.toast { position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--forest); color: var(--parchment); padding: 7px 14px; border-radius: 6px; font-size: 11px; box-shadow: 0 3px 8px rgba(0,0,0,0.3); z-index: 2000; opacity: 0; transition: all 0.3s; }
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; display: none; align-items: flex-end; }
+.modal.show { display: flex; }
+.modal-body { background: var(--card); border-radius: 12px 12px 0 0; width: 100%; max-height: 70vh; overflow-y: auto; padding: 14px; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.modal-head h3 { font-size: 15px; color: var(--forest); }
+.modal-close { width: 26px; height: 26px; border-radius: 50%; background: var(--muted); color: white; border: none; font-size: 14px; cursor: pointer; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.leaflet-container { background: var(--parchment); }
+.leaflet-popup-content-wrapper { background: var(--forest-mid); color: var(--parchment); border-radius: 6px; }
+.leaflet-popup-tip { background: var(--forest-mid); }
+.leaflet-popup-content { margin: 6px 10px; font-size: 11px; }
+.leaflet-control-zoom { border: none !important; }
+.leaflet-control-zoom a { background: var(--card) !important; color: var(--forest) !important; border: none !important; }
+</style>
+</head>
+<body>
+
+<svg style="display:none;">
+<defs>
+  <symbol id="ico-grass" viewBox="0 0 24 24"><path d="M12 20H2v-2c0-3 2-6 5-7 0 2 1 4 3 5v4h2zm10 0h-8v-4c2-1 3-3 3-5 3 1 5 4 5 7v2zm-10-8c-2-1-3-3-3-5V3l3 2 3-2v4c0 2-1 4-3 5z"/></symbol>
+  <symbol id="ico-sheep" viewBox="0 0 24 24"><path d="M20 8.5c0-1.5-1-2.5-2.5-2.5-.5 0-1 .1-1.5.4C15 5.5 13.5 5 12 5s-3 .5-4 1.4c-.5-.3-1-.4-1.5-.4C5 6 4 7 4 8.5c0 1 .5 1.8 1.2 2.2C5 11.1 5 11.5 5 12c0 2.8 3.1 5 7 5s7-2.2 7-5c0-.5 0-.9-.2-1.3.7-.4 1.2-1.2 1.2-2.2zM12 15c-2.8 0-5-1.3-5-3s2.2-3 5-3 5 1.3 5 3-2.2 3-5 3z"/><circle cx="9" cy="11" r="1"/><circle cx="15" cy="11" r="1"/></symbol>
+  <symbol id="ico-cow" viewBox="0 0 24 24"><path d="M12 2C9.5 2 7 3 7 5v1H5c-1 0-2 1-2 2v2c0 1 1 2 2 2h1v6c0 2 2 4 6 4s6-2 6-4v-6h1c1 0 2-1 2-2V8c0-1-1-2-2-2h-2V5c0-2-2.5-3-5-3zm-2 9a1 1 0 100 2 1 1 0 000-2zm4 0a1 1 0 100 2 1 1 0 000-2z"/></symbol>
+  <symbol id="ico-fence" viewBox="0 0 24 24"><path d="M3 3v4h2V5h2v2h2V5h2v2h2V5h2v2h2V5h2v2h2V3H3zm0 6v2h18V9H3zm0 4v2h2v2h2v-2h2v2h2v-2h2v2h2v-2h2v2h2v-2h2v-2H3zm0 6v2h18v-2H3z"/></symbol>
+  <symbol id="ico-polygon" viewBox="0 0 24 24"><path d="M2 2h6v6H2V2zm14 0h6v6h-6V2zM2 16h6v6H2v-6zm14 0h6v6h-6v-6zM8 5h8v2H8V5zm0 12h8v2H8v-2zM5 8h2v8H5V8zm12 0h2v8h-2V8z"/></symbol>
+  <symbol id="ico-note" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></symbol>
+  <symbol id="ico-move" viewBox="0 0 24 24"><path d="M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2l-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z"/></symbol>
+  <symbol id="ico-chart" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></symbol>
+  <symbol id="ico-health" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-1 11h-4v4h-4v-4H6v-4h4V6h4v4h4v4z"/></symbol>
+  <symbol id="ico-task" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></symbol>
+  <symbol id="ico-mic" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></symbol>
+  <symbol id="ico-stop" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></symbol>
+  <symbol id="ico-check" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+  <symbol id="ico-close" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+  <symbol id="ico-settings" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.44.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
+  <symbol id="ico-undo" viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05 1.04-6.83 2.73L3 8v8h8l-2.83-2.83C9.53 11.83 10.92 11 12.5 11c2.76 0 5.08 1.89 5.74 4.44l1.93-.64C19.23 11.36 16.15 8 12.5 8z"/></symbol>
+  <symbol id="ico-edit" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></symbol>
+  <symbol id="ico-add" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></symbol>
+  <symbol id="ico-alert" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></symbol>
+</defs>
+</svg>
+
+<div class="app">
+  <header>
+    <div class="header-left">
+      <div class="app-icon"><svg><use href="#ico-grass"/></svg></div>
+      <span class="app-title">Field Recorder</span>
+      <span class="date-badge" id="date-badge"></span>
+      <span class="task-badge" id="task-badge" onclick="setMode('tasks')" style="display:none;">0</span>
+    </div>
+    <div class="sync-status" onclick="openSettings()">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-text">Synced</span>
+      <svg style="width:12px;height:12px;fill:currentColor;margin-left:2px;"><use href="#ico-settings"/></svg>
+    </div>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="move" onclick="setMode('move')"><svg><use href="#ico-move"/></svg>Move</button>
+    <button class="mode-tab" data-mode="draw" onclick="setMode('draw')"><svg><use href="#ico-fence"/></svg>Draw</button>
+    <button class="mode-tab" data-mode="forage" onclick="setMode('forage')"><svg><use href="#ico-grass"/></svg>Forage</button>
+    <button class="mode-tab" data-mode="health" onclick="setMode('health')"><svg><use href="#ico-health"/></svg>Health</button>
+    <button class="mode-tab" data-mode="tasks" onclick="setMode('tasks')"><svg><use href="#ico-task"/></svg>Tasks</button>
+  </div>
+
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="draw-banner" id="draw-banner"><svg><use href="#ico-edit"/></svg><span id="draw-banner-text">Tap points</span></div>
+    <div class="measure-box" id="measure-box">
+      <div class="label" id="meas-label">Length</div>
+      <div class="primary" id="meas-value">0 ft</div>
+      <div class="secondary" id="meas-extra"></div>
+    </div>
+    <button class="voice-fab" id="voice-btn" onclick="toggleVoice()"><svg><use href="#ico-mic"/></svg></button>
+  </div>
+
+  <div class="action-panel">
+    <!-- MOVE -->
+    <div id="panel-move" class="panel active">
+      <div class="instruction-box" id="move-instr"><div class="step">Step 1: Select herd</div><div class="hint">Tap a herd below or on the map</div></div>
+      <div class="herd-buttons" id="herd-btns"></div>
+      <div class="move-summary" id="move-summary" style="display:none;"><h4>Confirm Move</h4><div class="move-detail"><span id="move-from"></span><span class="move-arrow">→</span><span id="move-to"></span></div></div>
+      <div class="btn-row" id="move-confirm" style="display:none;">
+        <button class="btn btn-cancel" onclick="cancelMove()"><svg><use href="#ico-close"/></svg>Cancel</button>
+        <button class="btn btn-confirm" onclick="confirmMove()"><svg><use href="#ico-check"/></svg>Confirm</button>
+      </div>
+    </div>
+
+    <!-- DRAW -->
+    <div id="panel-draw" class="panel">
+      <div class="draw-tools">
+        <button class="draw-btn" id="btn-draw-fence" onclick="startDraw('fence')"><svg><use href="#ico-fence"/></svg>Fence Line</button>
+        <button class="draw-btn" id="btn-draw-paddock" onclick="startDraw('paddock')"><svg><use href="#ico-polygon"/></svg>Temp Paddock</button>
+      </div>
+      <div class="btn-row" id="draw-actions" style="display:none;">
+        <button class="btn btn-cancel btn-sm" onclick="cancelDraw()"><svg><use href="#ico-close"/></svg>Cancel</button>
+        <button class="btn btn-outline btn-sm" onclick="undoPoint()"><svg><use href="#ico-undo"/></svg>Undo</button>
+        <button class="btn btn-confirm btn-sm" onclick="finishDraw()"><svg><use href="#ico-check"/></svg>Done</button>
+      </div>
+      <div class="drawing-list" id="drawing-list"></div>
+    </div>
+
+    <!-- FORAGE -->
+    <div id="panel-forage" class="panel">
+      <div class="observe-form" id="forage-form"></div>
+      <button class="btn btn-confirm" style="width:100%;margin-top:6px;" onclick="saveForage()"><svg><use href="#ico-check"/></svg>Save Forage Assessment</button>
+    </div>
+
+    <!-- HEALTH -->
+    <div id="panel-health" class="panel">
+      <div class="species-row" id="species-row"></div>
+      <div class="observe-form" id="health-form"></div>
+      <button class="btn btn-confirm" style="width:100%;margin-top:6px;" onclick="saveHealth()"><svg><use href="#ico-check"/></svg>Save Health Observation</button>
+    </div>
+
+    <!-- TASKS -->
+    <div id="panel-tasks" class="panel">
+      <div class="add-task-form" id="add-task-form" style="display:none;">
+        <input type="text" id="task-title" placeholder="Task description...">
+        <select id="task-type">
+          <option value="fence">🔲 Check/Fix Fence</option>
+          <option value="water">💧 Check Water</option>
+          <option value="voltage">⚡ Check Fence Voltage</option>
+          <option value="health">🩺 Animal Health</option>
+          <option value="move">🐑 Move Animals</option>
+          <option value="general">📝 General</option>
+        </select>
+        <input type="date" id="task-due">
+        <div class="btn-row">
+          <button class="btn btn-cancel btn-sm" onclick="toggleAddTask()">Cancel</button>
+          <button class="btn btn-confirm btn-sm" onclick="addTask()">Add Task</button>
+        </div>
+      </div>
+      <div class="btn-row" id="add-task-btn">
+        <button class="btn btn-outline" style="width:100%;" onclick="toggleAddTask()"><svg><use href="#ico-add"/></svg>Add Task</button>
+      </div>
+      <div class="task-list" id="task-list"></div>
+    </div>
+  </div>
+
+  <div class="recent-bar">
+    <div class="recent-header"><h4>Recent</h4><span class="pending-badge" id="pending-badge">0 pending</span></div>
+    <div class="recent-scroll" id="recent-list"></div>
+  </div>
+</div>
+
+<div class="modal" id="settings-modal">
+  <div class="modal-body">
+    <div class="modal-head"><h3>Settings</h3><button class="modal-close" onclick="closeSettings()">×</button></div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px;"><span id="stat-events">0</span> events · <span id="stat-drawings">0</span> drawings · <span id="stat-tasks">0</span> tasks</div>
+    <button class="btn btn-confirm btn-sm" style="width:100%;margin-bottom:6px;" onclick="exportJSON()">Export JSON</button>
+    <button class="btn btn-outline btn-sm" style="width:100%;margin-bottom:6px;" onclick="exportFarmOS()">Export FarmOS</button>
+    <button class="btn btn-danger btn-sm" style="width:100%;" onclick="clearAll()">Clear All Data</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const STORAGE_KEY = 'field_recorder_v2';
+const SCHEMA = 'field-recorder-2.0';
+
+let state = { schemaVersion: SCHEMA, events: [], pendingSync: [], drawings: [], tasks: [], settings: {} };
+let map, paddockLayer, drawingLayer, tempLayer;
+let paddockLayers = {}, herdMarkers = {};
+let mode = 'move';
+let selectedHerd = null, targetPaddock = null, moveStep = 1;
+let isDrawing = false, drawType = null, drawPts = [], drawMarkers = [], drawLine = null, editId = null;
+let selectedSpecies = 'sheep';
+
+const PADDOCKS = [
+  {id:'p1',name:'Kidder Plot',coords:[[-70.9768,43.1589],[-70.9765,43.1589],[-70.9757,43.1588],[-70.9753,43.1585],[-70.9751,43.1586],[-70.975,43.1589],[-70.9759,43.1594],[-70.9765,43.16],[-70.977,43.1597],[-70.9772,43.1594],[-70.9773,43.1593],[-70.9768,43.1589]],acres:3.2,color:'#65a30d'},
+  {id:'p3',name:'Pond',coords:[[-70.971,43.16],[-70.9705,43.1595],[-70.97,43.1595],[-70.9695,43.1598],[-70.9692,43.1605],[-70.9695,43.1612],[-70.9702,43.1615],[-70.971,43.1612],[-70.9715,43.1608],[-70.9712,43.1602],[-70.971,43.16]],acres:6.1,color:'#22c55e'},
+  {id:'p5',name:'High Power',coords:[[-70.9729,43.1589],[-70.9721,43.1581],[-70.9722,43.1581],[-70.975,43.1581],[-70.9752,43.1583],[-70.9748,43.1588],[-70.9746,43.1589],[-70.9745,43.1589],[-70.9729,43.1589]],acres:4.8,color:'#f97316'},
+  {id:'p10',name:'Hawk NW',coords:[[-70.9727,43.1634],[-70.9721,43.1628],[-70.972,43.1626],[-70.9716,43.1621],[-70.9724,43.1616],[-70.9726,43.1617],[-70.9744,43.1608],[-70.9745,43.161],[-70.9745,43.1611],[-70.9742,43.1617],[-70.9744,43.1619],[-70.9747,43.1623],[-70.9748,43.1625],[-70.9747,43.1626],[-70.9739,43.163],[-70.9727,43.1634]],acres:2.0,color:'#059669'},
+  {id:'p11',name:'Hawk SW',coords:[[-70.9715,43.162],[-70.9712,43.1617],[-70.9709,43.1614],[-70.9707,43.1615],[-70.9709,43.1618],[-70.9712,43.1621],[-70.9715,43.162]],acres:1.9,color:'#10b981'},
+  {id:'p15',name:'James Plot',coords:[[-70.9725,43.1635],[-70.9718,43.1626],[-70.971,43.1629],[-70.9706,43.1632],[-70.9703,43.1634],[-70.9699,43.1637],[-70.9697,43.1638],[-70.9698,43.1644],[-70.97,43.1645],[-70.9703,43.1644],[-70.9707,43.1644],[-70.971,43.1644],[-70.9725,43.1635]],acres:2.5,color:'#0d9488'}
+];
+
+const HERDS = [
+  {id:'h1',name:'Sheep Flock',icon:'sheep',color:'#d4a030',paddockId:'p10',count:77,species:'sheep'},
+  {id:'h2',name:'Cattle Herd',icon:'cow',color:'#78350f',paddockId:'p3',count:6,species:'cattle'}
+];
+
+// SPECIES-SPECIFIC HEALTH CONDITIONS
+const HEALTH_CONDITIONS = {
+  cattle: {
+    conditions: ['Pink eye','Respiratory/Pneumonia','Foot rot','Bloat','Hardware disease','Mastitis','Pinkeye','Scours/Diarrhea','Lice/Mange','Ringworm','Anaplasmosis','BVD','Johnes','Lumpy jaw'],
+    assessments: ['Body Condition Score (1-9)','Respiratory rate','Temperature','Rumen fill','Coat condition','Hoof condition'],
+    treatments: {
+      'Pink eye': {rx:'LA-200 or Biomycin 200 (1ml/10lb IM)',withdrawal:'28 days meat'},
+      'Respiratory/Pneumonia': {rx:'Draxxin (1ml/100lb SQ) or Nuflor (3ml/100lb)',withdrawal:'28-42 days'},
+      'Foot rot': {rx:'LA-200 (1ml/10lb IM) + Copper sulfate footbath',withdrawal:'28 days'},
+      'Bloat': {rx:'Drench with mineral oil, trocar if severe',withdrawal:'None'},
+      'Scours/Diarrhea': {rx:'Electrolytes, Spectam Scour-Halt for calves',withdrawal:'Varies'}
+    }
+  },
+  sheep: {
+    conditions: ['FAMACHA Score 1','FAMACHA Score 2','FAMACHA Score 3','FAMACHA Score 4','FAMACHA Score 5','Foot rot/Scald','Pregnancy toxemia','Mastitis','Pneumonia','Bottle jaw','Abortion','Wool break','Orf/Soremouth','Caseous lymphadenitis','Listeriosis'],
+    assessments: ['FAMACHA Score','Body Condition Score (1-5)','Dag score','Foot score','Respiration'],
+    treatments: {
+      'FAMACHA Score 4': {rx:'Prohibit (Levamisole) 3ml/25lb or Cydectin 1ml/11lb',withdrawal:'3-11 days'},
+      'FAMACHA Score 5': {rx:'URGENT: Prohibit + supportive care, B vitamins',withdrawal:'Varies'},
+      'Foot rot/Scald': {rx:'Zinc sulfate footbath 10%, trim if needed, LA-200 if severe',withdrawal:'28 days'},
+      'Pregnancy toxemia': {rx:'Propylene glycol 60ml 2x daily, dextrose IV if down',withdrawal:'None'},
+      'Pneumonia': {rx:'Nuflor (1ml/25lb) or Draxxin',withdrawal:'28 days'}
+    }
+  },
+  poultry: {
+    conditions: ['Respiratory wheeze/rattle','Mites/Lice','Bumblefoot','Egg binding','Prolapse','Coccidiosis','Mareks disease','Fowl pox','Infectious bronchitis','Molting','Crop issues','Scaly leg mites'],
+    assessments: ['Activity level','Comb color','Droppings','Egg production','Feather condition','Weight'],
+    treatments: {
+      'Respiratory wheeze/rattle': {rx:'VetRx, isolate, check ventilation. Tylan if bacterial.',withdrawal:'14 days eggs'},
+      'Mites/Lice': {rx:'Permethrin dust/spray, clean coop, diatomaceous earth',withdrawal:'None'},
+      'Bumblefoot': {rx:'Soak, remove plug, flush with betadine, bandage, antibiotics if severe',withdrawal:'Varies'},
+      'Coccidiosis': {rx:'Corid (Amprolium) in water 5-7 days',withdrawal:'None'}
+    }
+  },
+  swine: {
+    conditions: ['Respiratory/Cough','Diarrhea/Scours','Lameness','Mange/Skin issues','Erysipelas','Mastitis','Prolapse','Fighting wounds','Off feed','Constipation','Anemia (piglets)'],
+    assessments: ['Body Condition Score','Respiratory rate','Skin condition','Mobility','Feed intake'],
+    treatments: {
+      'Respiratory/Cough': {rx:'Draxxin (1ml/100lb) or LA-200',withdrawal:'5-28 days'},
+      'Diarrhea/Scours': {rx:'Electrolytes, Spectam or Neomycin for piglets',withdrawal:'Varies'},
+      'Mange/Skin issues': {rx:'Ivermectin 1ml/75lb SQ',withdrawal:'18 days'},
+      'Erysipelas': {rx:'Penicillin 1ml/100lb IM 2x daily',withdrawal:'7 days'}
+    }
+  },
+  horse: {
+    conditions: ['Colic signs','Laminitis/Founder','Respiratory/Heaves','Eye issue','Wound/Laceration','Lameness','Rain rot/Skin','Thrush','White line disease','Choke','Tying up','Scratches/Mud fever'],
+    assessments: ['TPR (Temp/Pulse/Resp)','Gut sounds','Digital pulse','Capillary refill','Hydration','Hoof condition'],
+    treatments: {
+      'Colic signs': {rx:'Walk, no feed, Banamine 10ml/1000lb IV/IM. CALL VET if no improvement.',withdrawal:'4 days'},
+      'Laminitis/Founder': {rx:'EMERGENCY: Ice hooves, Banamine, soft bedding. CALL VET/FARRIER.',withdrawal:'4 days'},
+      'Thrush': {rx:'Clean daily, apply Kopertox or dilute iodine',withdrawal:'None'},
+      'Rain rot/Skin': {rx:'Betadine scrub, keep dry, antifungal if needed',withdrawal:'None'}
+    }
+  }
+};
+
+// FORAGE SPECIES REFERENCE (NRCS/Cornell)
+const FORAGE_SPECIES = {
+  desirable_cool: ['Orchardgrass','Timothy','Kentucky Bluegrass','Perennial Ryegrass','Tall Fescue','Smooth Bromegrass','Reed Canarygrass','White Clover','Red Clover','Alsike Clover','Birdsfoot Trefoil','Alfalfa'],
+  desirable_warm: ['Bermudagrass','Bahiagrass','Big Bluestem','Indiangrass','Switchgrass','Eastern Gamagrass'],
+  increaser: ['Broomsedge','Poverty Grass','Sedges','Annual Ryegrass','Annual Lespedeza'],
+  invader: ['Buttercup','Curly Dock','Canada Thistle','Multiflora Rose','Japanese Honeysuckle','Autumn Olive','Spotted Knapweed','Bedstraw','Plantain','Dandelion','Wild Carrot'],
+  toxic: ['Bracken Fern','Cherry (wilted)','Black Walnut','Jimsonweed','Nightshade','Pokeweed','Water Hemlock','White Snakeroot','Yew']
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  initMap();
+  initUI();
+  updateSync();
+  renderRecent();
+  renderDrawings();
+  renderTasks();
+  checkOverdueTasks();
+});
+
+function loadState() { try { const s = localStorage.getItem(STORAGE_KEY); if(s) state = {...state,...JSON.parse(s)}; if(!state.drawings) state.drawings=[]; if(!state.tasks) state.tasks=[]; } catch(e){} }
+function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){} }
+
+function initMap() {
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([43.1605, -70.972], 15);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+  paddockLayer = L.featureGroup().addTo(map);
+  drawingLayer = L.featureGroup().addTo(map);
+  tempLayer = L.featureGroup().addTo(map);
+  renderPaddocks();
+  renderHerds();
+  renderDrawingsOnMap();
+  map.on('click', onMapClick);
+}
+
+function initUI() {
+  document.getElementById('date-badge').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  renderHerdBtns();
+  renderForageForm();
+  renderSpeciesRow();
+  renderHealthForm();
+}
+
+function renderPaddocks() {
+  paddockLayer.clearLayers();
+  paddockLayers = {};
+  PADDOCKS.forEach(p => {
+    const ll = p.coords.map(c=>[c[1],c[0]]);
+    const poly = L.polygon(ll, { color: p.color, weight: 2, fillColor: p.color, fillOpacity: 0.25 });
+    poly.pid = p.id;
+    poly.on('click', e => { if(!isDrawing){ L.DomEvent.stopPropagation(e); onPaddockClick(p); } });
+    poly.bindTooltip(p.name, { permanent: false, direction: 'center' });
+    paddockLayer.addLayer(poly);
+    paddockLayers[p.id] = poly;
+  });
+}
+
+function renderHerds() {
+  Object.values(herdMarkers).forEach(m => map.removeLayer(m));
+  herdMarkers = {};
+  HERDS.forEach(h => {
+    const p = PADDOCKS.find(x=>x.id===h.paddockId); if(!p) return;
+    const c = centroid(p.coords);
+    const ico = h.icon==='sheep' ? '#ico-sheep' : '#ico-cow';
+    const marker = L.marker([c[1],c[0]], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="background:${h.color};width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 5px rgba(0,0,0,0.3);"><svg style="width:16px;height:16px;fill:white;"><use href="${ico}"/></svg></div>`,
+        iconSize: [32,32], iconAnchor: [16,16]
+      })
+    });
+    marker.hid = h.id;
+    marker.on('click', e => { if(!isDrawing){ L.DomEvent.stopPropagation(e); onHerdClick(h); } });
+    marker.addTo(map);
+    herdMarkers[h.id] = marker;
+  });
+}
+
+function renderDrawingsOnMap() {
+  drawingLayer.clearLayers();
+  state.drawings.filter(d=>d.status!=='removed').forEach(d => {
+    const ll = d.coords.map(c=>[c[1],c[0]]);
+    if(d.type==='fence') {
+      const line = L.polyline(ll, { color: '#f97316', weight: 4, dashArray: '8,5' });
+      line.bindPopup(`<b>Fence</b><br>${d.length}<br>${d.rolls} rolls`);
+      drawingLayer.addLayer(line);
+    } else {
+      const poly = L.polygon(ll, { color: '#8b5cf6', weight: 3, fillColor: '#8b5cf6', fillOpacity: 0.2, dashArray: '6,4' });
+      poly.bindPopup(`<b>Temp Paddock</b><br>${d.area}<br>${d.perimeter}`);
+      drawingLayer.addLayer(poly);
+    }
+  });
+}
+
+function centroid(coords) { let x=0,y=0; coords.forEach(c=>{x+=c[0];y+=c[1];}); return [x/coords.length, y/coords.length]; }
+
+// MODE
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode===m));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+m).classList.add('active');
+  if(m!=='move') cancelMove();
+  if(m!=='draw') cancelDraw();
+}
+
+// MOVE
+function renderHerdBtns() {
+  document.getElementById('herd-btns').innerHTML = HERDS.map(h => `
+    <button class="herd-btn" data-h="${h.id}" onclick="selectHerd('${h.id}')">
+      <svg><use href="#ico-${h.icon}"/></svg>${h.name}<span class="count">${h.count} head</span>
+    </button>
+  `).join('');
+}
+
+function selectHerd(hid) {
+  selectedHerd = HERDS.find(h=>h.id===hid);
+  moveStep = 2;
+  document.querySelectorAll('.herd-btn').forEach(b => b.classList.toggle('selected', b.dataset.h===hid));
+  document.getElementById('move-instr').innerHTML = `<div class="step">Step 2: Tap destination</div><div class="hint">Select paddock for ${selectedHerd.name}</div>`;
+  highlight(selectedHerd.paddockId, true);
+}
+
+function onHerdClick(h) { if(mode==='move' && moveStep===1) selectHerd(h.id); }
+
+function onPaddockClick(p) {
+  if(mode==='move' && moveStep===2 && selectedHerd) selectTarget(p);
+  else if(mode==='forage' || mode==='health') {
+    const sel = document.getElementById('obs-paddock');
+    if(sel) sel.value = p.id;
+    toast(`Selected: ${p.name}`);
+  }
+}
+
+function selectTarget(p) {
+  if(p.id === selectedHerd.paddockId) { toast('Already here'); return; }
+  targetPaddock = p;
+  moveStep = 3;
+  document.getElementById('move-instr').style.display = 'none';
+  document.getElementById('move-summary').style.display = 'block';
+  document.getElementById('move-confirm').style.display = 'flex';
+  document.getElementById('move-from').textContent = selectedHerd.name;
+  document.getElementById('move-to').textContent = p.name;
+  highlight(p.id, true);
+}
+
+function confirmMove() {
+  const from = PADDOCKS.find(x=>x.id===selectedHerd.paddockId);
+  recordEvent({ id: uid(), type: 'move', timestamp: new Date().toISOString(),
+    data: { herdId: selectedHerd.id, herdName: selectedHerd.name, fromPaddockId: selectedHerd.paddockId, fromPaddockName: from?.name, toPaddockId: targetPaddock.id, toPaddockName: targetPaddock.name }
+  });
+  HERDS.find(h=>h.id===selectedHerd.id).paddockId = targetPaddock.id;
+  renderHerds();
+  toast(`Moved ${selectedHerd.name} → ${targetPaddock.name}`);
+  cancelMove();
+}
+
+function cancelMove() {
+  selectedHerd = null; targetPaddock = null; moveStep = 1;
+  document.querySelectorAll('.herd-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('move-instr').style.display = 'block';
+  document.getElementById('move-instr').innerHTML = `<div class="step">Step 1: Select herd</div><div class="hint">Tap a herd below or on the map</div>`;
+  document.getElementById('move-summary').style.display = 'none';
+  document.getElementById('move-confirm').style.display = 'none';
+  clearHighlights();
+}
+
+function highlight(id, on) { const l = paddockLayers[id]; if(l) l.setStyle({ weight: on?4:2, fillOpacity: on?0.4:0.25 }); }
+function clearHighlights() { Object.values(paddockLayers).forEach(l => l.setStyle({ weight: 2, fillOpacity: 0.25 })); }
+
+// DRAW
+function startDraw(type) {
+  isDrawing = true; drawType = type; drawPts = []; drawMarkers = []; editId = null;
+  paddockLayer.eachLayer(l => { l.options.interactive = false; if(l._path) l._path.style.pointerEvents = 'none'; });
+  document.getElementById('btn-draw-fence').classList.toggle('active-fence', type==='fence');
+  document.getElementById('btn-draw-paddock').classList.toggle('active-paddock', type==='paddock');
+  document.getElementById('draw-actions').style.display = 'flex';
+  const banner = document.getElementById('draw-banner');
+  banner.classList.add('active');
+  banner.classList.toggle('paddock', type==='paddock');
+  document.getElementById('draw-banner-text').textContent = type==='fence' ? 'Tap for fence' : 'Tap for paddock';
+  showMeas('--', type==='fence'?'Length':'Area', '');
+}
+
+function onMapClick(e) {
+  if(!isDrawing) return;
+  drawPts.push([e.latlng.lng, e.latlng.lat]);
+  const color = drawType==='fence' ? '#f97316' : '#8b5cf6';
+  drawMarkers.push(L.circleMarker(e.latlng, { radius: 6, color, fillColor: color, fillOpacity: 1, weight: 2 }).addTo(tempLayer));
+  updatePreview();
+}
+
+function updatePreview() {
+  if(drawLine) tempLayer.removeLayer(drawLine);
+  if(drawPts.length < 2) { showMeas('--', drawType==='fence'?'Length':'Area', ''); return; }
+  const ll = drawPts.map(c=>[c[1],c[0]]);
+  const color = drawType==='fence' ? '#f97316' : '#8b5cf6';
+  if(drawType==='fence') {
+    drawLine = L.polyline(ll, { color, weight: 4, dashArray: '8,5' }).addTo(tempLayer);
+    const len = calcLen(drawPts);
+    showMeas(len+' ft', 'Length', `~${Math.ceil(len/164)} rolls`);
+  } else {
+    drawLine = L.polygon([...ll, ll[0]], { color, weight: 3, fillColor: color, fillOpacity: 0.2, dashArray: '6,4' }).addTo(tempLayer);
+    const area = calcArea(drawPts);
+    const perim = calcLen([...drawPts, drawPts[0]]);
+    showMeas(area+' ac', 'Area', `${perim} ft · ~${Math.ceil(perim/164)} rolls`);
+  }
+}
+
+function undoPoint() { if(!drawPts.length) return; drawPts.pop(); const m=drawMarkers.pop(); if(m) tempLayer.removeLayer(m); updatePreview(); }
+
+function finishDraw() {
+  if(drawType==='fence' && drawPts.length<2) { toast('Need 2+ points'); return; }
+  if(drawType==='paddock' && drawPts.length<3) { toast('Need 3+ points'); return; }
+  const perimPts = drawType==='paddock' ? [...drawPts, drawPts[0]] : drawPts;
+  const len = calcLen(perimPts);
+  const drawing = { id: editId || uid(), type: drawType, coords: [...drawPts], length: len+' ft', rolls: Math.ceil(len/164), created: new Date().toLocaleString(), status: 'active' };
+  if(drawType==='paddock') { drawing.area = calcArea(drawPts)+' ac'; drawing.perimeter = len+' ft'; }
+  if(editId) { const idx = state.drawings.findIndex(d=>d.id===editId); if(idx>=0) state.drawings[idx] = drawing; }
+  else state.drawings.push(drawing);
+  recordEvent({ id: uid(), type: drawType==='fence'?'fence_install':'paddock_create', timestamp: new Date().toISOString(), data: drawing });
+  saveState(); renderDrawingsOnMap(); renderDrawings();
+  toast(`${drawType==='fence'?'Fence':'Paddock'} saved`);
+  cancelDraw();
+}
+
+function cancelDraw() {
+  isDrawing = false; drawType = null; drawPts = []; editId = null;
+  tempLayer.clearLayers(); drawMarkers = []; drawLine = null;
+  paddockLayer.eachLayer(l => { l.options.interactive = true; if(l._path) l._path.style.pointerEvents = 'auto'; });
+  document.getElementById('btn-draw-fence').classList.remove('active-fence');
+  document.getElementById('btn-draw-paddock').classList.remove('active-paddock');
+  document.getElementById('draw-actions').style.display = 'none';
+  document.getElementById('draw-banner').classList.remove('active','paddock');
+  hideMeas();
+}
+
+function editDrawing(id) {
+  const d = state.drawings.find(x=>x.id===id); if(!d) return;
+  setMode('draw'); startDraw(d.type); editId = id;
+  d.coords.forEach(c => {
+    drawPts.push(c);
+    drawMarkers.push(L.circleMarker([c[1],c[0]], { radius: 6, color: d.type==='fence'?'#f97316':'#8b5cf6', fillColor: d.type==='fence'?'#f97316':'#8b5cf6', fillOpacity: 1 }).addTo(tempLayer));
+  });
+  updatePreview();
+  toast('Editing - tap to add points');
+}
+
+function takeDownDrawing(id) {
+  const d = state.drawings.find(x=>x.id===id); if(!d) return;
+  d.status = 'removed';
+  d.removedAt = new Date().toISOString();
+  recordEvent({ id: uid(), type: d.type==='fence'?'fence_remove':'paddock_remove', timestamp: new Date().toISOString(), data: { drawingId: id, type: d.type, length: d.length } });
+  saveState(); renderDrawingsOnMap(); renderDrawings();
+  toast(`${d.type==='fence'?'Fence':'Paddock'} removed & logged`);
+}
+
+function deleteDrawing(id) {
+  state.drawings = state.drawings.filter(d=>d.id!==id);
+  saveState(); renderDrawingsOnMap(); renderDrawings();
+  toast('Deleted');
+}
+
+function renderDrawings() {
+  const active = state.drawings.filter(d=>d.status!=='removed');
+  const c = document.getElementById('drawing-list');
+  if(!active.length) { c.innerHTML = '<p style="color:var(--muted);font-size:10px;text-align:center;padding:10px;">No active drawings</p>'; return; }
+  c.innerHTML = active.map(d => `
+    <div class="drawing-item ${d.type}">
+      <div class="drawing-info">
+        <div class="name">${d.type==='fence'?'Fence':'Paddock'}</div>
+        <div class="stats">${d.type==='fence'?d.length:d.area}</div>
+        <div class="meta">${d.rolls} rolls</div>
+      </div>
+      <div class="drawing-actions">
+        <button class="btn-edit-sm" onclick="editDrawing('${d.id}')">Edit</button>
+        <button class="btn-take-sm" onclick="takeDownDrawing('${d.id}')">Take Down</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showMeas(val, label, extra) { const el=document.getElementById('measure-box'); el.classList.add('active'); document.getElementById('meas-value').textContent=val; document.getElementById('meas-label').textContent=label; document.getElementById('meas-extra').textContent=extra; }
+function hideMeas() { document.getElementById('measure-box').classList.remove('active'); }
+
+function calcLen(pts) { let t=0; for(let i=0;i<pts.length-1;i++) t+=haversine(pts[i][1],pts[i][0],pts[i+1][1],pts[i+1][0]); return Math.round(t); }
+function calcArea(pts) { if(pts.length<3) return '0.00'; let a=0; for(let i=0;i<pts.length;i++){ const j=(i+1)%pts.length; a+=pts[i][0]*pts[j][1]-pts[j][0]*pts[i][1]; } a=Math.abs(a)/2; return (a*111319*111319*Math.cos(43.16*Math.PI/180)/4046.86).toFixed(2); }
+function haversine(lat1,lon1,lat2,lon2) { const R=20902231,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180; const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)); }
+
+// FORAGE ASSESSMENT
+function renderForageForm() {
+  document.getElementById('forage-form').innerHTML = `
+    <label>Paddock (or tap map)</label>
+    <select id="obs-paddock"><option value="">Select...</option>${PADDOCKS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
+    
+    <label>Sward Height (inches) - use grazing stick</label>
+    <input type="number" id="forage-height" placeholder="Average height">
+    <p class="help">NRCS 528: Leave 3-4" residual (cool season), 4-6" (warm season)</p>
+    
+    <label>Forage Density</label>
+    <select id="forage-density">
+      <option value="sparse">Sparse (&lt;50% ground cover)</option>
+      <option value="moderate">Moderate (50-75%)</option>
+      <option value="dense" selected>Dense (75-90%)</option>
+      <option value="very_dense">Very Dense (&gt;90%)</option>
+    </select>
+    
+    <label>Dominant Species (check all present &gt;20%)</label>
+    <select id="forage-dominant" multiple style="height:60px;">
+      ${FORAGE_SPECIES.desirable_cool.slice(0,8).map(s=>`<option value="${s}">${s}</option>`).join('')}
+    </select>
+    <p class="help">Ref: Cornell Forage ID Guide, NRCS Plant Materials</p>
+    
+    <label>Legume % (visual estimate)</label>
+    <select id="forage-legume">
+      <option value="0">0% - None visible</option>
+      <option value="10">~10%</option>
+      <option value="20">~20%</option>
+      <option value="30" selected>~30% (Target)</option>
+      <option value="40">~40%+</option>
+    </select>
+    
+    <label>Undesirable/Invasive Plants Present</label>
+    <select id="forage-invasive" multiple style="height:50px;">
+      ${FORAGE_SPECIES.invader.slice(0,8).map(s=>`<option value="${s}">${s}</option>`).join('')}
+    </select>
+    
+    <label>Pasture Condition Score (1-5)</label>
+    <select id="forage-pcs">
+      <option value="1">1 - Poor: &lt;50% cover, compacted, severe erosion</option>
+      <option value="2">2 - Fair: 50-70% cover, some bare spots</option>
+      <option value="3" selected>3 - Good: 70-85% cover, minor issues</option>
+      <option value="4">4 - Very Good: 85-95% cover, healthy</option>
+      <option value="5">5 - Excellent: &gt;95% cover, diverse, no issues</option>
+    </select>
+    
+    <label>Notes</label>
+    <textarea id="forage-notes" placeholder="Recovery observations, grazing pressure, etc."></textarea>
+    
+    <div class="info-box">
+      <b>NRCS Grazing Guidelines:</b><br>
+      • Start grazing: 8-10" height<br>
+      • Stop grazing: 3-4" residual<br>
+      • Recovery: 25-35 days (varies by season)<br>
+      • Target: 30% legume in mix
+    </div>
+  `;
+}
+
+function saveForage() {
+  const paddockId = document.getElementById('obs-paddock')?.value;
+  if(!paddockId) { toast('Select paddock'); return; }
+  const dominant = Array.from(document.getElementById('forage-dominant').selectedOptions).map(o=>o.value);
+  const invasive = Array.from(document.getElementById('forage-invasive').selectedOptions).map(o=>o.value);
+  
+  recordEvent({ id: uid(), type: 'forage_assessment', timestamp: new Date().toISOString(), data: {
+    paddockId,
+    paddockName: PADDOCKS.find(p=>p.id===paddockId)?.name,
+    height: document.getElementById('forage-height')?.value,
+    density: document.getElementById('forage-density')?.value,
+    dominantSpecies: dominant,
+    legumePct: document.getElementById('forage-legume')?.value,
+    invasiveSpecies: invasive,
+    pcsScore: document.getElementById('forage-pcs')?.value,
+    notes: document.getElementById('forage-notes')?.value
+  }});
+  renderForageForm();
+  toast('Forage assessment saved');
+}
+
+// HEALTH OBSERVATIONS
+function renderSpeciesRow() {
+  document.getElementById('species-row').innerHTML = ['cattle','sheep','poultry','swine','horse'].map(s => 
+    `<button class="species-btn ${s===selectedSpecies?'active':''}" onclick="selectSpecies('${s}')">${s.charAt(0).toUpperCase()+s.slice(1)}</button>`
+  ).join('');
+}
+
+function selectSpecies(s) {
+  selectedSpecies = s;
+  renderSpeciesRow();
+  renderHealthForm();
+}
+
+function renderHealthForm() {
+  const sp = HEALTH_CONDITIONS[selectedSpecies];
+  const condOpts = sp.conditions.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const assessOpts = sp.assessments.map(a=>`<option value="${a}">${a}</option>`).join('');
+  
+  document.getElementById('health-form').innerHTML = `
+    <label>Paddock / Location</label>
+    <select id="obs-paddock"><option value="">Select...</option>${PADDOCKS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
+    
+    <label>Animal ID (optional)</label>
+    <input type="text" id="health-animal" placeholder="Tag # or name">
+    
+    <label>Assessment Type</label>
+    <select id="health-assess">${assessOpts}</select>
+    
+    <label>Condition Observed</label>
+    <select id="health-condition" onchange="showTreatment()">
+      <option value="">Normal - no issues</option>
+      ${condOpts}
+    </select>
+    
+    <label>Severity</label>
+    <select id="health-severity">
+      <option value="normal">Normal/Healthy</option>
+      <option value="mild">Mild - Monitor</option>
+      <option value="moderate">Moderate - Treat</option>
+      <option value="severe">Severe - Urgent</option>
+    </select>
+    
+    <div id="treatment-info"></div>
+    
+    <label>Notes / Treatment Given</label>
+    <textarea id="health-notes" placeholder="Observations, treatment administered..."></textarea>
+  `;
+}
+
+function showTreatment() {
+  const condition = document.getElementById('health-condition')?.value;
+  const sp = HEALTH_CONDITIONS[selectedSpecies];
+  const info = document.getElementById('treatment-info');
+  
+  if(condition && sp.treatments[condition]) {
+    const t = sp.treatments[condition];
+    info.innerHTML = `<div class="info-box"><b>Suggested Treatment:</b><br>${t.rx}<br><small>Withdrawal: ${t.withdrawal}</small></div>`;
+  } else if(condition && condition.includes('FAMACHA Score 5')) {
+    info.innerHTML = `<div class="warn-box"><b>⚠️ URGENT:</b> FAMACHA 5 indicates severe anemia. Treat immediately with dewormer + supportive care.</div>`;
+  } else {
+    info.innerHTML = '';
+  }
+}
+
+function saveHealth() {
+  const condition = document.getElementById('health-condition')?.value;
+  const paddockId = document.getElementById('obs-paddock')?.value;
+  
+  recordEvent({ id: uid(), type: 'health_observation', timestamp: new Date().toISOString(), data: {
+    species: selectedSpecies,
+    paddockId,
+    animalId: document.getElementById('health-animal')?.value,
+    assessment: document.getElementById('health-assess')?.value,
+    condition: condition || 'Normal',
+    severity: document.getElementById('health-severity')?.value,
+    notes: document.getElementById('health-notes')?.value
+  }});
+  renderHealthForm();
+  toast('Health observation saved');
+}
+
+// TASKS
+function toggleAddTask() {
+  const form = document.getElementById('add-task-form');
+  const btn = document.getElementById('add-task-btn');
+  const showing = form.style.display !== 'none';
+  form.style.display = showing ? 'none' : 'block';
+  btn.style.display = showing ? 'flex' : 'none';
+  if(!showing) {
+    document.getElementById('task-due').value = new Date().toISOString().split('T')[0];
+  }
+}
+
+function addTask() {
+  const title = document.getElementById('task-title')?.value;
+  if(!title) { toast('Enter task'); return; }
+  state.tasks.push({
+    id: uid(),
+    title,
+    type: document.getElementById('task-type')?.value || 'general',
+    due: document.getElementById('task-due')?.value,
+    created: new Date().toISOString(),
+    done: false
+  });
+  saveState();
+  renderTasks();
+  toggleAddTask();
+  document.getElementById('task-title').value = '';
+  toast('Task added');
+}
+
+function toggleTask(id) {
+  const task = state.tasks.find(t=>t.id===id);
+  if(task) {
+    task.done = !task.done;
+    if(task.done) {
+      task.completedAt = new Date().toISOString();
+      recordEvent({ id: uid(), type: 'task_complete', timestamp: new Date().toISOString(), data: { taskId: id, title: task.title, type: task.type }});
+    }
+    saveState();
+    renderTasks();
+  }
+}
+
+function deleteTask(id) {
+  state.tasks = state.tasks.filter(t=>t.id!==id);
+  saveState();
+  renderTasks();
+}
+
+function renderTasks() {
+  const today = new Date().toISOString().split('T')[0];
+  const pending = state.tasks.filter(t=>!t.done).sort((a,b)=>(a.due||'9999')>(b.due||'9999')?1:-1);
+  const completed = state.tasks.filter(t=>t.done).slice(-5);
+  
+  const c = document.getElementById('task-list');
+  if(!pending.length && !completed.length) {
+    c.innerHTML = '<p style="color:var(--muted);font-size:10px;text-align:center;padding:10px;">No tasks</p>';
+    document.getElementById('task-badge').style.display = 'none';
+    return;
+  }
+  
+  const overdue = pending.filter(t=>t.due && t.due < today).length;
+  const badge = document.getElementById('task-badge');
+  if(overdue > 0) {
+    badge.textContent = overdue;
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
+  
+  const typeIcons = { fence: '🔲', water: '💧', voltage: '⚡', health: '🩺', move: '🐑', general: '📝' };
+  
+  c.innerHTML = pending.map(t => {
+    const isOverdue = t.due && t.due < today;
+    const isToday = t.due === today;
+    return `
+    <div class="task-item ${isOverdue?'overdue':''} ${isToday?'today':'upcoming'}">
+      <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${t.id}')"><svg><use href="#ico-check"/></svg></div>
+      <div class="task-content">
+        <div class="task-title">${typeIcons[t.type]||'📝'} ${t.title}</div>
+        <div class="task-meta">
+          <span class="task-due ${isOverdue?'overdue':''} ${isToday?'today':''}">${t.due ? (isOverdue?'Overdue: ':isToday?'Today: ':'Due: ')+t.due : 'No due date'}</span>
+        </div>
+      </div>
+    </div>
+  `}).join('') + (completed.length ? '<div style="font-size:9px;color:var(--muted);margin:8px 0 4px;text-transform:uppercase;">Completed</div>' + completed.map(t => `
+    <div class="task-item" style="opacity:0.6;">
+      <div class="task-check done"><svg><use href="#ico-check"/></svg></div>
+      <div class="task-content"><div class="task-title" style="text-decoration:line-through;">${t.title}</div></div>
+    </div>
+  `).join('') : '');
+  
+  document.getElementById('stat-tasks').textContent = state.tasks.length;
+}
+
+function checkOverdueTasks() {
+  const today = new Date().toISOString().split('T')[0];
+  const overdue = state.tasks.filter(t=>!t.done && t.due && t.due < today);
+  if(overdue.length > 0) {
+    setTimeout(() => toast(`⚠️ ${overdue.length} overdue task${overdue.length>1?'s':''}`), 1000);
+  }
+}
+
+// EVENTS
+function recordEvent(e) { e.schemaVersion = SCHEMA; e.synced = false; state.events.push(e); state.pendingSync.push(e.id); saveState(); updateSync(); renderRecent(); }
+function renderRecent() {
+  const c = document.getElementById('recent-list');
+  const r = state.events.slice(-5).reverse();
+  if(!r.length) { c.innerHTML = '<div class="recent-item"><div class="desc">No events</div></div>'; return; }
+  c.innerHTML = r.map(e => {
+    const t = new Date(e.timestamp).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    let d = e.type.replace(/_/g,' ');
+    if(e.type==='move') d = `${e.data.herdName} → ${e.data.toPaddockName}`;
+    else if(e.type==='forage_assessment') d = `Forage: ${e.data.paddockName}`;
+    else if(e.type==='health_observation') d = `Health: ${e.data.species}`;
+    return `<div class="recent-item"><div class="time">${t}</div><div class="desc">${d}</div></div>`;
+  }).join('');
+  document.getElementById('pending-badge').textContent = state.pendingSync.length+' pending';
+  document.getElementById('stat-events').textContent = state.events.length;
+  document.getElementById('stat-drawings').textContent = state.drawings.length;
+}
+function updateSync() { const dot=document.getElementById('sync-dot'),txt=document.getElementById('sync-text'); if(!navigator.onLine){dot.className='sync-dot offline';txt.textContent='Offline';} else if(state.pendingSync.length){dot.className='sync-dot pending';txt.textContent=state.pendingSync.length+' pending';} else{dot.className='sync-dot';txt.textContent='Synced';} }
+
+// VOICE
+let recog=null,recording=false;
+function toggleVoice() {
+  const btn=document.getElementById('voice-btn');
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){toast('Voice not supported');return;}
+  if(recording){recog.stop();btn.classList.remove('recording');btn.innerHTML='<svg><use href="#ico-mic"/></svg>';recording=false;}
+  else{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;recog=new SR();recog.continuous=false;recog.onresult=e=>processVoice(e.results[0][0].transcript);recog.onend=()=>{btn.classList.remove('recording');btn.innerHTML='<svg><use href="#ico-mic"/></svg>';recording=false;};recog.start();btn.classList.add('recording');btn.innerHTML='<svg><use href="#ico-stop"/></svg>';recording=true;}
+}
+function processVoice(txt) {
+  const l=txt.toLowerCase(); toast(`"${txt}"`);
+  if(l.includes('move')&&l.includes('sheep')){setMode('move');selectHerd('h1');}
+  else if(l.includes('move')&&(l.includes('cattle')||l.includes('cow'))){setMode('move');selectHerd('h2');}
+  else if(l.includes('fence')||l.includes('draw')){setMode('draw');}
+  else if(l.includes('forage')||l.includes('grass')){setMode('forage');}
+  else if(l.includes('health')||l.includes('sick')){setMode('health');}
+  else if(l.includes('task')){setMode('tasks');}
+}
+
+// SETTINGS
+function openSettings() { document.getElementById('settings-modal').classList.add('show'); document.getElementById('stat-events').textContent=state.events.length; document.getElementById('stat-drawings').textContent=state.drawings.length; document.getElementById('stat-tasks').textContent=state.tasks.length; }
+function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
+function exportJSON() { dl({schemaVersion:SCHEMA,events:state.events,drawings:state.drawings,tasks:state.tasks},`field-recorder-${new Date().toISOString().split('T')[0]}.json`); toast('Exported'); }
+function exportFarmOS() { const logs=state.events.map(e=>({type:e.type.includes('observe')||e.type.includes('forage')||e.type.includes('health')?'log--observation':'log--activity',timestamp:e.timestamp,...e.data})); dl({schemaVersion:'farmos-export-1.0',logs},`farmos-${new Date().toISOString().split('T')[0]}.json`); toast('FarmOS export'); }
+function clearAll() { if(confirm('Clear all?')){state.events=[];state.pendingSync=[];state.drawings=[];state.tasks=[];saveState();renderRecent();renderDrawingsOnMap();renderDrawings();renderTasks();toast('Cleared');}}
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,6);}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function dl(data,fn){const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn;a.click();URL.revokeObjectURL(a.href);}
+
+window.addEventListener('online',updateSync);
+window.addEventListener('offline',updateSync);
+</script>
+</body>
+</html>
