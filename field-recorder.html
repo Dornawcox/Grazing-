@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a2e0a">
+<title>Field Recorder</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+  --forest: #1a2e0a;
+  --forest-mid: #243d10;
+  --grass: #4d7c0f;
+  --grass-light: #65a30d;
+  --amber: #d97706;
+  --hay: #ca8a04;
+  --earth: #78350f;
+  --parchment: #faf5e4;
+  --card: #fffdf8;
+  --danger: #dc2626;
+  --water: #0ea5e9;
+  --muted: #6b7280;
+  --success: #16a34a;
+  --fence: #f97316;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
+  background: var(--forest);
+  color: var(--parchment);
+  touch-action: manipulation;
+}
+
+.app { display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+
+header {
+  background: var(--forest);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--grass);
+  z-index: 1000;
+  flex-shrink: 0;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.app-icon {
+  width: 32px; height: 32px;
+  background: var(--grass);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.app-icon svg { width: 18px; height: 18px; stroke: var(--parchment); fill: none; stroke-width: 2; }
+.app-title { font-size: 17px; font-weight: 700; }
+.date-badge {
+  background: var(--grass);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sync-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--grass-light);
+  cursor: pointer; padding: 6px;
+}
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+.sync-dot.pending { background: var(--amber); }
+.sync-dot.offline { background: var(--muted); }
+.settings-icon { width: 18px; height: 18px; stroke: var(--parchment); opacity: 0.7; fill: none; stroke-width: 2; }
+
+.map-container { flex: 1; position: relative; min-height: 0; }
+#map { width: 100%; height: 100%; }
+
+#draw-overlay {
+  position: absolute; inset: 0; z-index: 500;
+  display: none; cursor: crosshair;
+}
+#draw-overlay.active { display: block; }
+
+.mode-tabs {
+  display: flex;
+  background: var(--forest-mid);
+  border-bottom: 1px solid rgba(101,163,13,0.3);
+  flex-shrink: 0;
+}
+.mode-tab {
+  flex: 1;
+  padding: 10px 8px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(250,245,228,0.5);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.mode-tab.active {
+  color: var(--parchment);
+  background: rgba(101,163,13,0.2);
+  border-bottom: 2px solid var(--grass-light);
+}
+.mode-tab svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+.draw-banner {
+  display: none;
+  position: absolute;
+  top: 10px; left: 50%; transform: translateX(-50%);
+  background: var(--amber);
+  color: #1a1a1a;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  gap: 10px;
+  align-items: center;
+}
+.draw-banner.active { display: flex; }
+.draw-banner .stats {
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(0,0,0,0.15);
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+.draw-banner button {
+  background: rgba(0,0,0,0.2);
+  border: none;
+  color: #1a1a1a;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.draw-banner button.finish { background: var(--forest); color: var(--parchment); }
+
+.action-panel {
+  background: var(--card);
+  border-top: 3px solid var(--grass);
+  padding: 14px;
+  flex-shrink: 0;
+  max-height: 42vh;
+  overflow-y: auto;
+}
+
+.move-instruction {
+  text-align: center;
+  padding: 12px;
+  background: rgba(101,163,13,0.1);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  color: var(--forest);
+}
+.move-instruction .step { font-size: 14px; font-weight: 600; color: var(--grass); }
+.move-instruction .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.herd-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.herd-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: 12px 10px;
+  border: 2px solid var(--muted);
+  border-radius: 10px;
+  background: white;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--forest);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.herd-btn.selected { border-color: var(--grass); background: rgba(101,163,13,0.1); }
+.herd-btn svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 2; }
+.herd-btn .herd-count { font-size: 10px; color: var(--muted); }
+
+.move-summary {
+  background: rgba(101,163,13,0.1);
+  border: 2px solid var(--grass);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.move-summary h4 { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; }
+.move-detail { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--forest); }
+.move-arrow { color: var(--grass); font-weight: bold; }
+
+.confirm-buttons { display: flex; gap: 8px; }
+.btn {
+  flex: 1;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+.btn-confirm { background: var(--grass); color: white; }
+.btn-confirm:active { background: var(--grass-light); transform: scale(0.98); }
+.btn-cancel { background: var(--muted); color: white; }
+
+.draw-tools { display: flex; gap: 8px; margin-bottom: 12px; }
+.draw-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border: 2px solid var(--muted);
+  border-radius: 10px;
+  background: white;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--forest);
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.draw-btn.active { border-color: var(--fence); background: rgba(249,115,22,0.1); }
+.draw-btn.paddock-btn.active { border-color: var(--grass); background: rgba(101,163,13,0.1); }
+.draw-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+.draw-list { max-height: 150px; overflow-y: auto; }
+.draw-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  background: white;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+.draw-item.fence { border-left: 4px solid var(--fence); }
+.draw-item.paddock { border-left: 4px solid var(--grass); }
+.draw-item-info { font-size: 12px; color: var(--forest); flex: 1; }
+.draw-item-info small { color: var(--muted); display: block; font-size: 10px; margin-top: 2px; }
+.draw-item-actions { display: flex; gap: 4px; }
+.item-btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  font-size: 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.item-btn.delete { background: var(--danger); color: white; }
+.empty-state { color: var(--muted); font-size: 12px; text-align: center; padding: 20px; }
+
+.observe-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+.observe-btn {
+  padding: 10px 6px;
+  border: 2px solid var(--muted);
+  border-radius: 10px;
+  background: white;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--forest);
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.observe-btn.active { border-color: var(--water); background: rgba(14,165,233,0.1); }
+.observe-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+.observe-form {
+  background: white;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+.observe-form label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+.observe-form input,
+.observe-form select,
+.observe-form textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.observe-form textarea { min-height: 60px; resize: none; }
+
+.recent-events { background: var(--forest-mid); padding: 10px 16px; flex-shrink: 0; }
+.recent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.recent-header h4 { font-size: 10px; text-transform: uppercase; color: var(--grass-light); letter-spacing: 0.5px; }
+.recent-count { font-size: 9px; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px; }
+.recent-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.recent-item {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  max-width: 180px;
+}
+.recent-item .time { color: var(--grass-light); font-size: 9px; }
+.recent-item .desc { color: var(--parchment); margin-top: 2px; }
+
+.voice-fab {
+  position: absolute;
+  bottom: 16px; right: 16px;
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--grass);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.voice-fab svg { width: 24px; height: 24px; stroke: white; fill: none; stroke-width: 2; }
+.voice-fab:active { transform: scale(0.95); }
+.voice-fab.recording { background: var(--danger); animation: pulse 1s infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); } 50% { box-shadow: 0 0 0 12px rgba(220,38,38,0); } }
+
+.toast {
+  position: fixed;
+  bottom: 90px; left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--forest);
+  color: var(--parchment);
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 2000;
+  opacity: 0;
+  transition: all 0.3s;
+}
+.toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+.leaflet-container { background: var(--parchment); }
+.leaflet-popup-content-wrapper { background: var(--forest-mid); color: var(--parchment); border-radius: 10px; }
+.leaflet-popup-tip { background: var(--forest-mid); }
+.leaflet-popup-content { margin: 10px 14px; }
+.leaflet-control-zoom { border: none !important; }
+.leaflet-control-zoom a { background: var(--card) !important; color: var(--forest) !important; border: none !important; }
+
+.panel { display: none; }
+.panel.active { display: block; }
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 3000;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-content {
+  background: var(--card);
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.modal-header h3 { font-size: 18px; color: var(--forest); }
+.modal-close { width: 32px; height: 32px; border-radius: 50%; background: var(--muted); color: white; border: none; font-size: 18px; cursor: pointer; }
+.settings-section { margin-bottom: 20px; }
+.settings-section h4 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.settings-row label { font-size: 14px; color: var(--forest); }
+.toggle { width: 50px; height: 28px; background: var(--muted); border-radius: 14px; position: relative; cursor: pointer; }
+.toggle.on { background: var(--grass); }
+.toggle::after { content: ''; position: absolute; width: 24px; height: 24px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: left 0.2s; }
+.toggle.on::after { left: 24px; }
+.export-btn { width: 100%; padding: 14px; background: var(--grass); color: white; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.export-btn.secondary { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <div class="header-left">
+      <div class="app-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      </div>
+      <span class="app-title">Field Recorder</span>
+      <span class="date-badge" id="current-date"></span>
+    </div>
+    <div class="sync-status" onclick="openSettings()">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-text">Synced</span>
+      <svg class="settings-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </div>
+  </header>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="move" onclick="setMode('move')">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M4 17h10"/><path d="M14 7l6 5-6 5"/></svg>
+      Move
+    </button>
+    <button class="mode-tab" data-mode="draw" onclick="setMode('draw')">
+      <svg viewBox="0 0 24 24"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+      Draw
+    </button>
+    <button class="mode-tab" data-mode="observe" onclick="setMode('observe')">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+      Observe
+    </button>
+  </div>
+
+  <div class="map-container">
+    <div id="map"></div>
+    <div id="draw-overlay"></div>
+    
+    <div class="draw-banner" id="draw-banner">
+      <span id="draw-type-label">Drawing Fence</span>
+      <span class="stats" id="draw-stats">0 ft</span>
+      <button onclick="undoLastPoint()">Undo</button>
+      <button class="finish" onclick="finishDrawing()">Done</button>
+      <button onclick="cancelDrawing()">Cancel</button>
+    </div>
+    
+    <button class="voice-fab" id="voice-btn" onclick="toggleVoice()">
+      <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4m-4 0h8"/></svg>
+    </button>
+  </div>
+
+  <div class="action-panel">
+    <div id="panel-move" class="panel active">
+      <div class="move-instruction" id="move-instruction">
+        <div class="step">Step 1: Select a herd to move</div>
+        <div class="hint">Tap a herd below or on the map</div>
+      </div>
+      <div class="herd-buttons" id="herd-buttons"></div>
+      <div class="move-summary" id="move-summary" style="display:none;">
+        <h4>Confirm Move</h4>
+        <div class="move-detail">
+          <span id="move-herd"></span>
+          <span class="move-arrow">→</span>
+          <span id="move-to"></span>
+        </div>
+      </div>
+      <div class="confirm-buttons" id="confirm-buttons" style="display:none;">
+        <button class="btn btn-cancel" onclick="cancelMove()">Cancel</button>
+        <button class="btn btn-confirm" onclick="confirmMove()">
+          <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+          Confirm
+        </button>
+      </div>
+    </div>
+
+    <div id="panel-draw" class="panel">
+      <div class="draw-tools">
+        <button class="draw-btn" id="draw-fence-btn" onclick="startDraw('fence')">
+          <svg viewBox="0 0 24 24"><path d="M4 4v16M12 4v16M20 4v16M4 8h8M12 8h8M4 14h8M12 14h8"/></svg>
+          Fence Line
+        </button>
+        <button class="draw-btn paddock-btn" id="draw-paddock-btn" onclick="startDraw('paddock')">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          Temp Paddock
+        </button>
+      </div>
+      <div class="draw-list" id="draw-list">
+        <div class="empty-state">No temporary features drawn.<br>Tap a tool above, then tap points on map.</div>
+      </div>
+    </div>
+
+    <div id="panel-observe" class="panel">
+      <div class="observe-types">
+        <button class="observe-btn active" data-type="forage" onclick="setObserveType('forage')">
+          <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="4"/></svg>
+          Forage
+        </button>
+        <button class="observe-btn" data-type="pcs" onclick="setObserveType('pcs')">
+          <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          PCS
+        </button>
+        <button class="observe-btn" data-type="water" onclick="setObserveType('water')">
+          <svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
+          Water
+        </button>
+        <button class="observe-btn" data-type="health" onclick="setObserveType('health')">
+          <svg viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7z"/></svg>
+          Health
+        </button>
+        <button class="observe-btn" data-type="weather" onclick="setObserveType('weather')">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          Weather
+        </button>
+        <button class="observe-btn" data-type="note" onclick="setObserveType('note')">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Note
+        </button>
+      </div>
+      <div class="observe-form" id="observe-form"></div>
+      <button class="btn btn-confirm" style="margin-top:12px;" onclick="saveObservation()">
+        <svg viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+        Save Observation
+      </button>
+    </div>
+  </div>
+
+  <div class="recent-events">
+    <div class="recent-header">
+      <h4>Recent Activity</h4>
+      <span class="recent-count" id="pending-count">0 pending</span>
+    </div>
+    <div class="recent-list" id="recent-list">
+      <div class="recent-item"><div class="time">No events</div><div class="desc">Start recording!</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Settings & Sync</h3>
+      <button class="modal-close" onclick="closeSettings()">×</button>
+    </div>
+    <div class="settings-section">
+      <h4>Sync</h4>
+      <div class="settings-row"><label>FarmOS Sync</label><div class="toggle" id="toggle-farmos" onclick="toggleSetting('farmos')"></div></div>
+      <div class="settings-row"><label>Auto-sync</label><div class="toggle on" id="toggle-autosync" onclick="toggleSetting('autosync')"></div></div>
+    </div>
+    <div class="settings-section">
+      <h4>Export</h4>
+      <button class="export-btn" onclick="exportEvents()">Export Event Log</button>
+      <button class="export-btn secondary" onclick="exportFarmOS()">Export FarmOS Format</button>
+    </div>
+    <div class="settings-section">
+      <h4>Local Data</h4>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;"><span id="event-count">0</span> events</div>
+      <button class="export-btn secondary" onclick="clearEvents()">Clear Synced Events</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const SCHEMA_VERSION = 'field-recorder-1.0';
+const STORAGE_KEY = 'field_recorder_v1';
+
+let state = {
+  schemaVersion: SCHEMA_VERSION,
+  events: [],
+  pendingSync: [],
+  tempFences: [],
+  tempPaddocks: [],
+  settings: { farmosSync: false, autoSync: true }
+};
+
+let map, tempFenceLayer, tempPaddockLayer, drawPreviewLayer;
+let paddockLayers = {}, herdMarkers = {};
+let currentMode = 'move', currentObserveType = 'forage';
+let selectedHerd = null, targetPaddock = null, moveStep = 1;
+let isDrawing = false, drawType = null, drawPoints = [];
+
+const PADDOCKS = [
+  {id:'p1',name:'Kidder Plot',coords:[[-70.9768,43.1589],[-70.9765,43.1589],[-70.9757,43.1588],[-70.9753,43.1585],[-70.9751,43.1586],[-70.9750,43.1589],[-70.9759,43.1594],[-70.9765,43.1600],[-70.9770,43.1597],[-70.9772,43.1594],[-70.9773,43.1593],[-70.9768,43.1589]],acres:3.2,color:'#65a30d'},
+  {id:'p3',name:'Pond',coords:[[-70.9710,43.1600],[-70.9705,43.1595],[-70.9700,43.1595],[-70.9695,43.1598],[-70.9692,43.1605],[-70.9695,43.1612],[-70.9702,43.1615],[-70.9710,43.1612],[-70.9715,43.1608],[-70.9712,43.1602],[-70.9710,43.1600]],acres:6.1,color:'#22c55e'},
+  {id:'p5',name:'High Power',coords:[[-70.9729,43.1589],[-70.9721,43.1581],[-70.9722,43.1581],[-70.9750,43.1581],[-70.9752,43.1583],[-70.9748,43.1588],[-70.9746,43.1589],[-70.9745,43.1589],[-70.9729,43.1589]],acres:4.8,color:'#f97316'},
+  {id:'p10',name:'Hawk NW',coords:[[-70.9727,43.1634],[-70.9721,43.1628],[-70.9720,43.1626],[-70.9716,43.1621],[-70.9724,43.1616],[-70.9726,43.1617],[-70.9744,43.1608],[-70.9745,43.1610],[-70.9745,43.1611],[-70.9742,43.1617],[-70.9744,43.1619],[-70.9747,43.1623],[-70.9748,43.1625],[-70.9747,43.1626],[-70.9739,43.1630],[-70.9727,43.1634]],acres:2.0,color:'#059669'},
+  {id:'p11',name:'Hawk SW',coords:[[-70.9715,43.1620],[-70.9712,43.1617],[-70.9709,43.1614],[-70.9707,43.1615],[-70.9709,43.1618],[-70.9712,43.1621],[-70.9715,43.1620]],acres:1.9,color:'#10b981'},
+  {id:'p12',name:'Hawk NE',coords:[[-70.9700,43.1625],[-70.9695,43.1620],[-70.9690,43.1618],[-70.9688,43.1622],[-70.9692,43.1628],[-70.9698,43.1630],[-70.9700,43.1625]],acres:2.7,color:'#34d399'},
+  {id:'p15',name:'James Plot',coords:[[-70.9725,43.1635],[-70.9718,43.1626],[-70.9710,43.1629],[-70.9706,43.1632],[-70.9703,43.1634],[-70.9699,43.1637],[-70.9697,43.1638],[-70.9698,43.1644],[-70.9700,43.1645],[-70.9703,43.1644],[-70.9707,43.1644],[-70.9710,43.1644],[-70.9725,43.1635]],acres:2.5,color:'#0d9488'},
+  {id:'p16',name:'James Pasture',coords:[[-70.9697,43.1638],[-70.9693,43.1635],[-70.9690,43.1637],[-70.9691,43.1640],[-70.9695,43.1640],[-70.9697,43.1638]],acres:3.9,color:'#14b8a6'}
+];
+
+const HERDS = [
+  {id:'h1',name:'Sheep Flock',color:'#d4a030',paddockId:'p10',count:77,species:'sheep'},
+  {id:'h2',name:'Cattle Herd',color:'#78350f',paddockId:'p3',count:6,species:'cattle'}
+];
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  initMap();
+  initUI();
+  updateSyncStatus();
+  renderRecentEvents();
+});
+
+function loadState() {
+  try { const s = localStorage.getItem(STORAGE_KEY); if (s) state = { ...state, ...JSON.parse(s) }; } catch(e) {}
+}
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function initMap() {
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([43.1605, -70.9720], 15);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+  tempFenceLayer = L.featureGroup().addTo(map);
+  tempPaddockLayer = L.featureGroup().addTo(map);
+  drawPreviewLayer = L.featureGroup().addTo(map);
+  renderPaddocks();
+  renderHerds();
+  renderTempFeatures();
+  map.on('click', onMapClick);
+  document.getElementById('draw-overlay').addEventListener('click', onOverlayClick);
+}
+
+function initUI() {
+  const d = new Date();
+  document.getElementById('current-date').textContent = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  renderHerdButtons();
+  setObserveType('forage');
+}
+
+function renderPaddocks() {
+  Object.values(paddockLayers).forEach(l => map.removeLayer(l));
+  paddockLayers = {};
+  PADDOCKS.forEach(p => {
+    const ll = p.coords.map(c => [c[1], c[0]]);
+    const poly = L.polygon(ll, { color: p.color, weight: 2, fillColor: p.color, fillOpacity: 0.25 });
+    poly.paddockId = p.id;
+    poly.on('click', e => { if (isDrawing) return; L.DomEvent.stopPropagation(e); onPaddockClick(p); });
+    poly.bindTooltip(p.name, { permanent: false, direction: 'center' });
+    poly.addTo(map);
+    paddockLayers[p.id] = poly;
+  });
+}
+
+function renderHerds() {
+  Object.values(herdMarkers).forEach(m => map.removeLayer(m));
+  herdMarkers = {};
+  HERDS.forEach(h => {
+    const p = PADDOCKS.find(x => x.id === h.paddockId); if (!p) return;
+    const c = getCentroid(p.coords);
+    const svg = h.species === 'sheep' ? '<circle cx="12" cy="8" r="5"/><ellipse cx="12" cy="16" rx="8" ry="5"/>' : '<ellipse cx="12" cy="14" rx="10" ry="6"/><circle cx="12" cy="6" r="4"/><path d="M6 8l-2 4M18 8l2 4"/>';
+    const m = L.marker([c[1], c[0]], {
+      icon: L.divIcon({
+        className: '',
+        html: `<div style="background:${h.color};width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="width:20px;height:20px;">${svg}</svg></div>`,
+        iconSize: [36, 36], iconAnchor: [18, 18]
+      })
+    });
+    m.herdId = h.id;
+    m.on('click', e => { if (isDrawing) return; L.DomEvent.stopPropagation(e); onHerdClick(h); });
+    m.addTo(map);
+    herdMarkers[h.id] = m;
+  });
+}
+
+function renderTempFeatures() {
+  tempFenceLayer.clearLayers();
+  tempPaddockLayer.clearLayers();
+  state.tempFences.forEach(f => {
+    const ll = f.coords.map(c => [c[1], c[0]]);
+    const line = L.polyline(ll, { color: '#f97316', weight: 4, dashArray: '10, 5' });
+    line.bindPopup(`<b>Fence</b><br>${f.length}<br><small>${f.created}</small>`);
+    tempFenceLayer.addLayer(line);
+  });
+  state.tempPaddocks.forEach(p => {
+    const ll = p.coords.map(c => [c[1], c[0]]);
+    const poly = L.polygon(ll, { color: '#65a30d', weight: 3, fillColor: '#65a30d', fillOpacity: 0.3, dashArray: '8, 4' });
+    poly.bindPopup(`<b>Temp Paddock</b><br>${p.area}<br>Perimeter: ${p.perimeter}<br><small>${p.created}</small>`);
+    tempPaddockLayer.addLayer(poly);
+  });
+  renderDrawList();
+}
+
+function getCentroid(coords) { let x=0,y=0; coords.forEach(c=>{x+=c[0];y+=c[1];}); return [x/coords.length, y/coords.length]; }
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + mode).classList.add('active');
+  if (isDrawing) cancelDrawing();
+  if (mode !== 'move') cancelMove();
+}
+
+function renderHerdButtons() {
+  document.getElementById('herd-buttons').innerHTML = HERDS.map(h => {
+    const svg = h.species === 'sheep' ? '<circle cx="12" cy="8" r="5"/><ellipse cx="12" cy="16" rx="8" ry="5"/>' : '<ellipse cx="12" cy="14" rx="10" ry="6"/><circle cx="12" cy="6" r="4"/><path d="M6 8l-2 4M18 8l2 4"/>';
+    return `<button class="herd-btn" data-herd="${h.id}" onclick="selectHerd('${h.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${svg}</svg>${h.name}<span class="herd-count">${h.count} head</span></button>`;
+  }).join('');
+}
+
+function selectHerd(id) {
+  selectedHerd = HERDS.find(h => h.id === id); moveStep = 2;
+  document.querySelectorAll('.herd-btn').forEach(b => b.classList.toggle('selected', b.dataset.herd === id));
+  document.getElementById('move-instruction').innerHTML = `<div class="step">Step 2: Tap destination paddock</div><div class="hint">Select where to move ${selectedHerd.name}</div>`;
+  highlightPaddock(selectedHerd.paddockId, true);
+}
+
+function onHerdClick(h) { if (currentMode === 'move' && moveStep === 1) selectHerd(h.id); }
+
+function onPaddockClick(p) {
+  if (currentMode === 'move' && moveStep === 2 && selectedHerd) selectTargetPaddock(p);
+  else if (currentMode === 'observe') {
+    const sel = document.getElementById('observe-paddock');
+    if (sel) { sel.value = p.id; showToast(`Selected: ${p.name}`); }
+  }
+}
+
+function selectTargetPaddock(p) {
+  if (p.id === selectedHerd.paddockId) { showToast('Already here'); return; }
+  targetPaddock = p; moveStep = 3;
+  document.getElementById('move-instruction').style.display = 'none';
+  document.getElementById('move-summary').style.display = 'block';
+  document.getElementById('confirm-buttons').style.display = 'flex';
+  document.getElementById('move-herd').textContent = selectedHerd.name;
+  document.getElementById('move-to').textContent = p.name;
+  highlightPaddock(p.id, true);
+}
+
+function confirmMove() {
+  const from = PADDOCKS.find(p => p.id === selectedHerd.paddockId);
+  recordEvent({ id: genId(), type: 'move', schemaVersion: SCHEMA_VERSION, timestamp: new Date().toISOString(), data: { herdId: selectedHerd.id, herdName: selectedHerd.name, fromPaddockId: selectedHerd.paddockId, fromPaddockName: from?.name, toPaddockId: targetPaddock.id, toPaddockName: targetPaddock.name }, synced: false });
+  HERDS.find(h => h.id === selectedHerd.id).paddockId = targetPaddock.id;
+  renderHerds();
+  showToast(`Moved ${selectedHerd.name} → ${targetPaddock.name}`);
+  cancelMove();
+}
+
+function cancelMove() {
+  selectedHerd = null; targetPaddock = null; moveStep = 1;
+  document.querySelectorAll('.herd-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('move-instruction').style.display = 'block';
+  document.getElementById('move-instruction').innerHTML = `<div class="step">Step 1: Select a herd to move</div><div class="hint">Tap a herd below or on the map</div>`;
+  document.getElementById('move-summary').style.display = 'none';
+  document.getElementById('confirm-buttons').style.display = 'none';
+  clearHighlights();
+}
+
+function highlightPaddock(id, on) { const l = paddockLayers[id]; if (l) l.setStyle({ weight: on ? 4 : 2, fillOpacity: on ? 0.4 : 0.25 }); }
+function clearHighlights() { Object.values(paddockLayers).forEach(l => l.setStyle({ weight: 2, fillOpacity: 0.25 })); }
+
+function startDraw(type) {
+  if (isDrawing) cancelDrawing();
+  isDrawing = true; drawType = type; drawPoints = [];
+  document.getElementById('draw-overlay').classList.add('active');
+  document.getElementById('draw-fence-btn').classList.toggle('active', type === 'fence');
+  document.getElementById('draw-paddock-btn').classList.toggle('active', type === 'paddock');
+  document.getElementById('draw-banner').classList.add('active');
+  document.getElementById('draw-type-label').textContent = type === 'fence' ? 'Drawing Fence' : 'Drawing Paddock';
+  updateDrawStats();
+  showToast(`Tap points to draw ${type}`);
+}
+
+function onOverlayClick(e) {
+  if (!isDrawing) return;
+  const rect = document.getElementById('map').getBoundingClientRect();
+  const pt = map.containerPointToLatLng([e.clientX - rect.left, e.clientY - rect.top]);
+  addDrawPoint(pt.lng, pt.lat);
+}
+
+function onMapClick(e) { if (!isDrawing) return; addDrawPoint(e.latlng.lng, e.latlng.lat); }
+
+function addDrawPoint(lng, lat) {
+  drawPoints.push([lng, lat]);
+  drawPreviewLayer.clearLayers();
+  drawPoints.forEach((p, i) => {
+    L.circleMarker([p[1], p[0]], { radius: 8, color: drawType === 'fence' ? '#f97316' : '#65a30d', fillColor: drawType === 'fence' ? '#f97316' : '#65a30d', fillOpacity: 1, weight: 2 }).bindTooltip(`${i + 1}`, { permanent: false }).addTo(drawPreviewLayer);
+  });
+  if (drawPoints.length >= 2) {
+    const ll = drawPoints.map(p => [p[1], p[0]]);
+    if (drawType === 'fence') L.polyline(ll, { color: '#f97316', weight: 4, dashArray: '10, 5' }).addTo(drawPreviewLayer);
+    else L.polygon(ll, { color: '#65a30d', weight: 3, fillColor: '#65a30d', fillOpacity: 0.3, dashArray: '8, 4' }).addTo(drawPreviewLayer);
+  }
+  updateDrawStats();
+}
+
+function undoLastPoint() {
+  if (drawPoints.length > 0) { drawPoints.pop(); drawPreviewLayer.clearLayers(); if (drawPoints.length > 0) { drawPoints.forEach((p,i) => { L.circleMarker([p[1],p[0]], { radius: 8, color: drawType === 'fence' ? '#f97316' : '#65a30d', fillColor: drawType === 'fence' ? '#f97316' : '#65a30d', fillOpacity: 1 }).addTo(drawPreviewLayer); }); if (drawPoints.length >= 2) { const ll = drawPoints.map(p => [p[1], p[0]]); if (drawType === 'fence') L.polyline(ll, { color: '#f97316', weight: 4, dashArray: '10, 5' }).addTo(drawPreviewLayer); else L.polygon(ll, { color: '#65a30d', weight: 3, fillColor: '#65a30d', fillOpacity: 0.3, dashArray: '8, 4' }).addTo(drawPreviewLayer); } } updateDrawStats(); }
+}
+
+function updateDrawStats() {
+  let s = '';
+  if (drawType === 'fence') s = `${Math.round(calcLength(drawPoints))} ft`;
+  else if (drawPoints.length >= 3) { const a = calcArea(drawPoints), p = calcPerimeter(drawPoints); s = `${a.toFixed(2)} ac | ${Math.round(p)} ft`; }
+  else s = `${drawPoints.length} pts`;
+  document.getElementById('draw-stats').textContent = s;
+}
+
+function finishDrawing() {
+  const min = drawType === 'fence' ? 2 : 3;
+  if (drawPoints.length < min) { showToast(`Need ${min}+ points`); return; }
+  if (drawType === 'fence') {
+    const len = Math.round(calcLength(drawPoints));
+    const f = { id: genId(), coords: [...drawPoints], length: `${len} ft`, lengthNum: len, created: new Date().toLocaleString() };
+    state.tempFences.push(f);
+    recordEvent({ id: genId(), type: 'fence', schemaVersion: SCHEMA_VERSION, timestamp: new Date().toISOString(), data: { fenceId: f.id, coords: f.coords, length: f.length }, synced: false });
+    showToast(`Fence: ${f.length}`);
+  } else {
+    const area = calcArea(drawPoints), peri = Math.round(calcPerimeter(drawPoints));
+    const p = { id: genId(), coords: [...drawPoints], area: `${area.toFixed(2)} ac`, areaNum: area, perimeter: `${peri} ft`, perimeterNum: peri, created: new Date().toLocaleString() };
+    state.tempPaddocks.push(p);
+    recordEvent({ id: genId(), type: 'temp_paddock', schemaVersion: SCHEMA_VERSION, timestamp: new Date().toISOString(), data: { paddockId: p.id, coords: p.coords, area: p.area, perimeter: p.perimeter }, synced: false });
+    showToast(`Paddock: ${p.area}, ${p.perimeter} perimeter`);
+  }
+  saveState(); renderTempFeatures(); cancelDrawing();
+}
+
+function cancelDrawing() {
+  isDrawing = false; drawType = null; drawPoints = [];
+  document.getElementById('draw-overlay').classList.remove('active');
+  document.getElementById('draw-banner').classList.remove('active');
+  document.getElementById('draw-fence-btn').classList.remove('active');
+  document.getElementById('draw-paddock-btn').classList.remove('active');
+  drawPreviewLayer.clearLayers();
+}
+
+function renderDrawList() {
+  const c = document.getElementById('draw-list');
+  const items = [...state.tempFences.map(f => ({ ...f, t: 'fence' })), ...state.tempPaddocks.map(p => ({ ...p, t: 'paddock' }))].sort((a,b) => new Date(b.created) - new Date(a.created));
+  if (!items.length) { c.innerHTML = '<div class="empty-state">No temporary features drawn.<br>Tap a tool above, then tap points on map.</div>'; return; }
+  c.innerHTML = items.map(i => `<div class="draw-item ${i.t}"><div class="draw-item-info"><strong>${i.t === 'fence' ? 'Fence: ' + i.length : 'Paddock: ' + i.area}</strong><small>${i.t === 'paddock' ? 'Perimeter: ' + i.perimeter + ' • ' : ''}${i.created}</small></div><div class="draw-item-actions"><button class="item-btn delete" onclick="delFeature('${i.t}','${i.id}')">Delete</button></div></div>`).join('');
+}
+
+function delFeature(t, id) {
+  if (t === 'fence') state.tempFences = state.tempFences.filter(f => f.id !== id);
+  else state.tempPaddocks = state.tempPaddocks.filter(p => p.id !== id);
+  saveState(); renderTempFeatures(); showToast('Removed');
+}
+
+function calcLength(coords) { let t = 0; for (let i = 0; i < coords.length - 1; i++) t += haversine(coords[i][1], coords[i][0], coords[i+1][1], coords[i+1][0]); return t; }
+function calcPerimeter(coords) { let t = calcLength(coords); if (coords.length >= 3) t += haversine(coords[coords.length-1][1], coords[coords.length-1][0], coords[0][1], coords[0][0]); return t; }
+function calcArea(coords) {
+  if (coords.length < 3) return 0;
+  const cLat = coords.reduce((s, c) => s + c[1], 0) / coords.length;
+  const latM = 111320, lngM = 111320 * Math.cos(cLat * Math.PI / 180);
+  const m = coords.map(c => [c[0] * lngM, c[1] * latM]);
+  let a = 0;
+  for (let i = 0; i < m.length; i++) { const j = (i + 1) % m.length; a += m[i][0] * m[j][1]; a -= m[j][0] * m[i][1]; }
+  return Math.abs(a) / 2 / 4046.86;
+}
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 20902231;
+  const dLat = (lat2 - lat1) * Math.PI / 180, dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+const OBSERVE_FORMS = {
+  forage: `<label>Paddock</label><select id="observe-paddock"><option value="">Tap map...</option>${PADDOCKS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select><label>Height (in)</label><input type="number" id="observe-height" inputmode="decimal"><label>Density</label><select id="observe-density"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select><label>Notes</label><textarea id="observe-notes"></textarea>`,
+  pcs: `<label>Paddock</label><select id="observe-paddock"><option value="">Tap map...</option>${PADDOCKS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select><label>Score (1-5)</label><select id="observe-pcs-score"><option value="1">1 Poor</option><option value="2">2</option><option value="3" selected>3 Fair</option><option value="4">4</option><option value="5">5 Excellent</option></select><label>Issue</label><select id="observe-pcs-issue"><option value="">None</option><option value="bare_soil">Bare Soil</option><option value="compaction">Compaction</option><option value="weeds">Weeds</option></select><label>Notes</label><textarea id="observe-notes"></textarea>`,
+  water: `<label>Source</label><select id="observe-water-source"><option value="tank">Tank</option><option value="trough">Trough</option><option value="stream">Stream</option><option value="pond">Pond</option></select><label>Status</label><select id="observe-water-status"><option value="full">Full</option><option value="adequate">Adequate</option><option value="low">Low</option><option value="problem">Problem</option></select><label>Notes</label><textarea id="observe-notes"></textarea>`,
+  health: `<label>Herd</label><select id="observe-herd">${HERDS.map(h=>`<option value="${h.id}">${h.name}</option>`).join('')}</select><label>Type</label><select id="observe-health-type"><option value="famacha">FAMACHA</option><option value="bcs">BCS</option><option value="lameness">Lameness</option><option value="general">General</option></select><label>Severity</label><select id="observe-severity"><option value="normal">Normal</option><option value="monitor">Monitor</option><option value="treat">Treat</option><option value="urgent">Urgent</option></select><label>Notes</label><textarea id="observe-notes"></textarea>`,
+  weather: `<label>Conditions</label><select id="observe-conditions"><option value="clear">Clear</option><option value="cloudy">Cloudy</option><option value="rain">Rain</option><option value="storm">Storm</option></select><label>Temp °F</label><input type="number" id="observe-temp" inputmode="decimal"><label>Rain (in)</label><input type="number" id="observe-rainfall" step="0.1" inputmode="decimal"><label>Notes</label><textarea id="observe-notes"></textarea>`,
+  note: `<label>Paddock</label><select id="observe-paddock"><option value="">General</option>${PADDOCKS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select><label>Category</label><select id="observe-category"><option value="general">General</option><option value="wildlife">Wildlife</option><option value="equipment">Equipment</option><option value="maintenance">Maintenance</option></select><label>Note</label><textarea id="observe-notes" style="min-height:80px;"></textarea>`
+};
+
+function setObserveType(type) {
+  currentObserveType = type;
+  document.querySelectorAll('.observe-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+  document.getElementById('observe-form').innerHTML = OBSERVE_FORMS[type] || OBSERVE_FORMS.note;
+}
+
+function saveObservation() {
+  const notes = document.getElementById('observe-notes')?.value || '';
+  let data = { observationType: currentObserveType, notes };
+  switch (currentObserveType) {
+    case 'forage': data.paddockId = document.getElementById('observe-paddock')?.value; data.height = document.getElementById('observe-height')?.value; data.density = document.getElementById('observe-density')?.value; if (!data.paddockId) { showToast('Select paddock'); return; } break;
+    case 'pcs': data.paddockId = document.getElementById('observe-paddock')?.value; data.score = document.getElementById('observe-pcs-score')?.value; data.issue = document.getElementById('observe-pcs-issue')?.value; if (!data.paddockId) { showToast('Select paddock'); return; } break;
+    case 'water': data.sourceType = document.getElementById('observe-water-source')?.value; data.status = document.getElementById('observe-water-status')?.value; break;
+    case 'health': data.herdId = document.getElementById('observe-herd')?.value; data.healthType = document.getElementById('observe-health-type')?.value; data.severity = document.getElementById('observe-severity')?.value; break;
+    case 'weather': data.conditions = document.getElementById('observe-conditions')?.value; data.temp = document.getElementById('observe-temp')?.value; data.rainfall = document.getElementById('observe-rainfall')?.value; break;
+    case 'note': data.paddockId = document.getElementById('observe-paddock')?.value; data.category = document.getElementById('observe-category')?.value; if (!notes) { showToast('Enter note'); return; } break;
+  }
+  recordEvent({ id: genId(), type: 'observe_' + currentObserveType, schemaVersion: SCHEMA_VERSION, timestamp: new Date().toISOString(), data, synced: false });
+  setObserveType(currentObserveType);
+  showToast('Saved');
+}
+
+function recordEvent(e) { state.events.push(e); state.pendingSync.push(e.id); saveState(); updateSyncStatus(); renderRecentEvents(); }
+
+function renderRecentEvents() {
+  const c = document.getElementById('recent-list');
+  const r = state.events.slice(-5).reverse();
+  if (!r.length) { c.innerHTML = '<div class="recent-item"><div class="time">No events</div><div class="desc">Start recording!</div></div>'; return; }
+  c.innerHTML = r.map(e => {
+    const t = new Date(e.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    let d = e.type;
+    if (e.type === 'move') d = `${e.data.herdName} → ${e.data.toPaddockName}`;
+    else if (e.type === 'fence') d = `Fence: ${e.data.length}`;
+    else if (e.type === 'temp_paddock') d = `Paddock: ${e.data.area}`;
+    else if (e.type.startsWith('observe_')) { const x = e.type.replace('observe_', ''); d = x.charAt(0).toUpperCase() + x.slice(1); if (e.data.paddockId) { const p = PADDOCKS.find(p => p.id === e.data.paddockId); d += ` @ ${p?.name || ''}`; } }
+    return `<div class="recent-item"><div class="time">${t}</div><div class="desc">${d}</div></div>`;
+  }).join('');
+  document.getElementById('pending-count').textContent = `${state.pendingSync.length} pending`;
+}
+
+function updateSyncStatus() {
+  const dot = document.getElementById('sync-dot'), txt = document.getElementById('sync-text');
+  if (!navigator.onLine) { dot.className = 'sync-dot offline'; txt.textContent = 'Offline'; }
+  else if (state.pendingSync.length > 0) { dot.className = 'sync-dot pending'; txt.textContent = `${state.pendingSync.length} pending`; }
+  else { dot.className = 'sync-dot'; txt.textContent = 'Synced'; }
+}
+
+let recognition = null, isRecording = false;
+function toggleVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { showToast('Voice not supported'); return; }
+  const btn = document.getElementById('voice-btn');
+  if (isRecording) { recognition.stop(); btn.classList.remove('recording'); isRecording = false; }
+  else {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR(); recognition.continuous = false; recognition.interimResults = false;
+    recognition.onresult = e => { const t = e.results[0][0].transcript; processVoice(t); };
+    recognition.onend = () => { btn.classList.remove('recording'); isRecording = false; };
+    recognition.start(); btn.classList.add('recording'); isRecording = true;
+  }
+}
+
+function processVoice(text) {
+  const l = text.toLowerCase();
+  showToast(`"${text}"`);
+  if (l.includes('move') && l.includes('sheep')) { setMode('move'); selectHerd('h1'); }
+  else if (l.includes('move') && (l.includes('cattle') || l.includes('cow'))) { setMode('move'); selectHerd('h2'); }
+  else if (l.includes('fence')) { setMode('draw'); startDraw('fence'); }
+  else if (l.includes('paddock')) { setMode('draw'); startDraw('paddock'); }
+  else if (l.includes('note') || l.includes('observe')) { setMode('observe'); setObserveType('note'); document.getElementById('observe-notes').value = text; }
+}
+
+function openSettings() { document.getElementById('settings-modal').classList.add('show'); document.getElementById('event-count').textContent = state.events.length; document.getElementById('toggle-farmos').classList.toggle('on', state.settings.farmosSync); document.getElementById('toggle-autosync').classList.toggle('on', state.settings.autoSync); }
+function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
+function toggleSetting(s) { if (s === 'farmos') { state.settings.farmosSync = !state.settings.farmosSync; document.getElementById('toggle-farmos').classList.toggle('on'); } else if (s === 'autosync') { state.settings.autoSync = !state.settings.autoSync; document.getElementById('toggle-autosync').classList.toggle('on'); } saveState(); }
+function exportEvents() { downloadJSON({ schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), events: state.events, tempFences: state.tempFences, tempPaddocks: state.tempPaddocks }, `field-recorder-${new Date().toISOString().split('T')[0]}.json`); showToast('Exported'); }
+function exportFarmOS() { const logs = state.events.map(e => ({ type: e.type.startsWith('observe') ? 'log--observation' : 'log--activity', timestamp: e.timestamp, ...e.data })); downloadJSON({ schemaVersion: 'farmos-export-1.0', exportedAt: new Date().toISOString(), logs }, `farmos-${new Date().toISOString().split('T')[0]}.json`); showToast('Exported FarmOS'); }
+function clearEvents() { const synced = state.events.filter(e => e.synced).length; if (confirm(`Clear ${synced} synced events?`)) { state.events = state.events.filter(e => !e.synced); saveState(); renderRecentEvents(); showToast('Cleared'); } }
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 6); }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+function downloadJSON(data, fn) { const b = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = fn; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); }
+
+window.addEventListener('online', updateSyncStatus);
+window.addEventListener('offline', updateSyncStatus);
+</script>
+</body>
+</html>
